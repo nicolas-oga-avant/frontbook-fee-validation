@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Frontbook fee validation Manifest",
+  "description": "Durable record of every Run. A bare invocation of the skill advances this file. Written through on every stage transition, never only at the end.",
+  "type": "object",
+  "required": ["schema", "seeded_from", "database", "pairs"],
+  "properties": {
+    "schema": {"const": 1},
+    "seeded_from": {
+      "type": "string",
+      "description": "data/run-matrix.csv@<sha256>. The skill refuses to start if the matrix no longer hashes to this; a changed matrix requires a deliberate --reseed.",
+      "pattern": "^data/run-matrix\\.csv@[0-9a-f]{64}$"
+    },
+    "database": {
+      "type": "object",
+      "description": "Identity of the Postgres the Campaign ran against. An Attempt from a destroyed database is unreproducible, not trustworthy.",
+      "required": ["compose_project", "volume"],
+      "properties": {
+        "compose_project": {"type": "string"},
+        "volume": {"type": "string"},
+        "restored_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "pairs": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/pair"}
+    }
+  },
+  "$defs": {
+    "pair": {
+      "type": "object",
+      "required": ["pair_id", "ticket", "runs"],
+      "properties": {
+        "pair_id": {"type": "string", "examples": ["0120->0122"]},
+        "ticket": {"type": "string", "pattern": "^CSRV-[0-9]+$"},
+        "runs": {
+          "type": "object",
+          "required": ["backbook", "frontbook"],
+          "properties": {
+            "backbook": {"$ref": "#/$defs/run"},
+            "frontbook": {"$ref": "#/$defs/run"}
+          }
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "required": ["code", "reachability", "expected", "attempts"],
+      "properties": {
+        "code": {"type": "string", "examples": ["0122", "3M33"]},
+        "reachability": {
+          "enum": ["direct", "mla_forced"],
+          "description": "direct: URL-selectable by strategy UUID. mla_forced: no UUID; applied under the non-MLA twin with the local MLA stub forcing a positive TransUnion MLA report."
+        },
+        "strategy_uuid": {"type": ["string", "null"], "description": "null for mla_forced codes, which have no UUID by design"},
+        "expected": {
+          "type": "object",
+          "description": "Copied from the matrix row at seed time so an Attempt stays interpretable if the matrix later changes.",
+          "properties": {
+            "late_fee_initial": {"type": "string"},
+            "late_fee_subsequent": {"type": "string"},
+            "foreign_transaction_fee": {"type": "string"},
+            "rpf": {"type": "string"},
+            "max_apr": {"type": "string"},
+            "annual_fee_y1": {"type": "string"},
+            "annual_fee_y2": {"type": "string"}
+          }
+        },
+        "status": {
+          "enum": ["pending", "in_progress", "halted", "passed", "failed", "blocked", "stale"],
+          "description": "DERIVED from the newest Attempt, never authored independently. halted = Mechanical Failure awaiting an agent. failed = Assertion Failure, which no agent may fix. stale = passed under a superseded Template Version and re-queued."
+        },
+        "attempts": {
+          "type": "array",
+          "description": "Append-only. An earlier Attempt is never overwritten: the evidence that made a result stale must survive alongside it.",
+          "items": {"$ref": "#/$defs/attempt"}
+        }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "required": ["attempt_id", "started_at", "stage", "provenance"],
+      "properties": {
+        "attempt_id": {"type": "string"},
+        "started_at": {"type": "string", "format": "date-time"},
+        "finished_at": {"type": ["string", "null"], "format": "date-time"},
+        "stage": {
+          "enum": ["applied", "approved", "issued", "cma_rendered", "asserted"],
+          "description": "Last completed step. Also the resume point."
+        },
+        "handles": {
+          "type": "object",
+          "description": "Captured by explicit id at creation. NEVER resolved later by recency - see AGENTS.md rule 1.",
+          "properties": {
+            "application_id": {"type": ["integer", "null"]},
+            "cca_id": {"type": ["integer", "null"]},
+            "cma_log_id": {"type": ["integer", "null"]}
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "description": "What this Attempt actually ran against. Without it a render cannot be attributed to an Epoch.",
+          "required": ["templateflow_host", "template_version"],
+          "properties": {
+            "templateflow_host": {"type": "string"},
+            "template_version": {"type": ["string", "null"], "description": "git_sha_version of the rendered CMA template. THE epoch signal. Never inferred from a fee amount."},
+            "repo_shas": {"type": "object", "additionalProperties": {"type": "string"}},
+            "mla_forced": {"type": "boolean"}
+          }
+        },
+        "assertions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["layer", "name", "expected", "actual", "passed"],
+            "properties": {
+              "layer": {"enum": ["value_table", "redline"]},
+              "point": {"enum": ["confetti", "decisioned_application", "cma_inputs", "rendered_cma", "csp_label"]},
+              "name": {"type": "string"},
+              "expected": {},
+              "actual": {},
+              "passed": {"type": "boolean"}
+            }
+          }
+        },
+        "failure": {
+          "type": ["object", "null"],
+          "required": ["class", "step", "summary"],
+          "properties": {
+            "class": {
+              "enum": ["mechanical", "assertion", "environment"],
+              "description": "mechanical: the apparatus broke; an agent may fix and resume. assertion: a result, never fixed by an agent. environment: invalidates every subsequent Run, so the whole Campaign stops."
+            },
+            "step": {"type": "string"},
+            "summary": {"type": "string"},
+            "expected_vs_observed": {"type": "string"},
+            "diagnosis": {"type": "string", "description": "The matching FINDINGS.md entry, quoted, by number."},
+            "finding_ref": {"type": ["integer", "null"]},
+            "suggested_action": {"type": "string"},
+            "resume_from": {"enum": ["applied", "approved", "issued", "cma_rendered", "asserted"]}
+          }
+        },
+        "interventions": {
+          "type": "array",
+          "description": "Fixes an agent applied mid-Campaign. Surfaced in the artifact, and persisted into local-stack/ so they replay on later builds.",
+          "items": {
+            "type": "object",
+            "required": ["at", "what"],
+            "properties": {
+              "at": {"type": "string", "format": "date-time"},
+              "what": {"type": "string"},
+              "persisted_to": {"type": ["string", "null"]}
+            }
+          }
+        },
+        "evidence_dir": {"type": "string", "examples": ["evidence/runs/0120-_gt_-0122/0122/attempt-1/"]}
+      }
+    }
+  }
+}

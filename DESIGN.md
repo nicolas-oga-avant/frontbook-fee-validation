@@ -33,8 +33,9 @@ bucket with no scope of its own.
 
 ### 1. One Manifest for all 28 Runs
 
-Seeded from `data/run-matrix.csv`, which already carries a `ticket` column and both directions of
-`replaces_or_replaced_by`. The four tickets are one procedure parameterised by code, so splitting
+Seeded from `data/run-matrix.csv`, which carries a `ticket` column, both directions of
+`replaces_or_replaced_by`, and a `reachability` column (`direct` or `mla_forced`). The schema is
+`data/manifest.schema.json` - a committed contract, so two agents cannot invent two shapes. The four tickets are one procedure parameterised by code, so splitting
 into four manifests would mean four seeds off one source and four artifacts to reconcile.
 
 **The caller passes one code, never two.** The partner is derived from the matrix. Typing both

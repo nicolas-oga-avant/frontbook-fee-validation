@@ -63,12 +63,25 @@ CRM   --API_URL_US-->              http://host.docker.internal:5001
 basic --CREDIT_CARD_API_ENDPOINT--> http://host.docker.internal:7100
 CCAPI --AVANT_BASIC_HOST_URL-->    http://host.docker.internal:5001
 CCAPI --FDR_GATEWAY_URL-->         https://fdr-gateway-asm.ocala.k8s.dev.global.avant.com
-basic --AVANT_TEMPLATES_HOST-->    Ocala templateflow-01   (never production - ADR 0001)
+basic --AVANT_TEMPLATES_HOST-->    templateflow.ocala.k8s.dev.global.avant.com   (never production - ADR 0001)
 ```
 
 `AVANT_TEMPLATES_HOST` and `AVANT_TEMPLATES_API_KEY` are read by
 `avant-basic/config/initializers/templateflow_engine_client.rb`. Pull the key from Vault at run time;
 never write it into `local-stack/*.yml`, which exist to be copied around.
+
+```bash
+export AVANT_TEMPLATES_HOST=templateflow.ocala.k8s.dev.global.avant.com
+export AVANT_TEMPLATES_API_KEY="$(vault kv get -field=value avant/dev/basic/secrets/AVANT_TEMPLATES_API_KEY)"
+```
+
+Host verified reachable: `GET https://templateflow.ocala.k8s.dev.global.avant.com/api/v1/templates`
+returns 401 without a key, which is what `TemplateflowEngine::Client::Send` maps to "your token is
+invalid". A 401 after setting the key means the key is wrong, not the host. The Vault path follows
+the platform convention and was not confirmed readable during setup - if it is not there, the key is
+whatever the deployed ocala `basic` has in its environment.
+
+("templateflow-01", named in CSRV-5299's testing plan, is a pod name, not a hostname.)
 
 ## Environment traps that cost hours
 

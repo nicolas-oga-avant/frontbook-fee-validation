@@ -23,7 +23,7 @@ Nothing below matters if this does not reproduce. Do it first, every time the en
 
 Deterministic, no browser. Wrap this first.
 
-- [ ] Manifest schema defined and seeded from `data/run-matrix.csv` with a content hash
+- [x] Manifest schema defined (`data/manifest.schema.json`); seeding from `data/run-matrix.csv` with a content hash still to implement
 - [ ] Manifest read/write with a lock, write-through on every stage transition
 - [ ] Append-only Attempt log; status derived from the newest Attempt
 - [ ] `issue!` -> `LocalCmaStub.prepare!` -> render, driven from a script
@@ -102,8 +102,9 @@ Deterministic, no browser. Wrap this first.
 
 - [ ] File the one-line `raw_test_data` defect in `avant-basic` (FINDINGS #3). It blocks the six
       backbook MLA Runs too, so it is not resolved by any other dependency
-- [ ] Verify Ocala `templateflow-01` has avant-templates#74's sha synced (CSRV-5219 is the readiness
-      dependency). **If it does not, AC 2 stays blocked regardless of everything else**
+- [ ] Verify `templateflow.ocala.k8s.dev.global.avant.com` has avant-templates#74's sha synced
+      (CSRV-5219 is the readiness dependency). Host is confirmed live; the API key is not yet in
+      hand. **If the sha is not synced, AC 2 stays blocked regardless of everything else**
 - [ ] `roll_pricing_strategy_configuration` still rolls 100% to `0120`, so no application is ever
       *organically* assigned a frontbook code. Does not block URL-driven testing. Flagged on CSRV-5297
 - [ ] CSRV-5823 tracks the deferred prd Confetti promotion
