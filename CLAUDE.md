@@ -48,7 +48,11 @@ decision 4.
   fabricated Base64 UUID; real ones look like `C26220125456184007040081`. Any FDR call for such an
   account fails with a 500 that says nothing about the code under test.
 - **Vault path convention**: `avant/${account_environment}/${service_name}/secrets/<KEY>`, one key
-  per sub-path with a single `value` field. So `avant/dev/basic/secrets/AVANT_TEMPLATES_API_KEY`.
+  per sub-path with a single `value` field. Not needed for this work - the one credential involved
+  (the TemplateFlow staging API key) is read from a pod's environment, see `SETUP.md`.
+- **Non-prod TemplateFlow is `stg`, not `dev`.** The global-dev account's deployment sets
+  `environment_override = "stg"`, so anything reasoning about a "dev TemplateFlow" is reasoning
+  about something that does not exist.
 - **Local basic answers a cold request in ~7s.** Use a generous timeout or a health check will
   conclude it is down when it is merely slow.
 

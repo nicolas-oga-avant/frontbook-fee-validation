@@ -12,6 +12,14 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Where the sibling repo checkouts live. Override on a machine that lays them out differently:
 #   AVANT_ROOT=/path/to/checkouts ./restore.sh
+# Local credentials and machine-specific paths. Gitignored; see .env.local.example.
+# Sourced before ROOT is resolved so it can set AVANT_ROOT.
+ENV_LOCAL="$HERE/../.env.local"
+if [ -f "$ENV_LOCAL" ]; then
+  set -a; . "$ENV_LOCAL"; set +a
+  echo "Loaded $(basename "$ENV_LOCAL")"
+fi
+
 ROOT="${AVANT_ROOT:-$(cd "$HERE/../../.." && pwd)}"
 
 for repo in avant-basic credit-card-api crm; do
@@ -54,6 +62,17 @@ for r in avant-basic credit-card-api crm; do
 done
 
 if [ "${1:-}" = "--up" ]; then
+  # A missing key does not fail here - it fails as a 401 at render time, long after
+  # the stack looks healthy. Check it while the message can still say why.
+  if [ -z "${AVANT_TEMPLATES_API_KEY:-}" ]; then
+    echo "FATAL: AVANT_TEMPLATES_API_KEY is not set." >&2
+    echo "  Every CMA render will fail with 401 (TemplateflowEngine maps it to" >&2
+    echo "  'your token is invalid'). Put it in .env.local:" >&2
+    echo "    cp .env.local.example .env.local && chmod 600 .env.local" >&2
+    echo "    kubectl -n templateflow-asm exec deploy/templateflow-01 -- printenv STAGING_API_KEY" >&2
+    exit 1
+  fi
+
   echo
   echo "Starting stacks..."
   (cd "$ROOT/avant-basic"     && docker compose -p basic-csrv-5300 up -d web sidekiq)

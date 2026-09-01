@@ -11,7 +11,7 @@ way to force it. See FINDINGS #3 and the root `CLAUDE.md`.
 | Docker with ~8GB available to the VM | three Rails/Node stacks, amd64-emulated on Apple Silicon |
 | Checkouts of `avant-basic`, `credit-card-api`, `crm` | siblings in one directory; see `AVANT_ROOT` below |
 | Chrome | the harness drives its own instance on a debug port, not yours |
-| Vault access | only for the Ocala TemplateFlow API key |
+| `kubectl` against `glbdev-use2-eks-ocala` | once, to read the TemplateFlow staging API key |
 | Python 3.11+ | the harness and the assertion scripts |
 
 Repo layout is not assumed. `local-stack/restore.sh` defaults to the parent-of-parent-of-parent of
@@ -67,21 +67,49 @@ basic --AVANT_TEMPLATES_HOST-->    templateflow.ocala.k8s.dev.global.avant.com  
 ```
 
 `AVANT_TEMPLATES_HOST` and `AVANT_TEMPLATES_API_KEY` are read by
-`avant-basic/config/initializers/templateflow_engine_client.rb`. Pull the key from Vault at run time;
-never write it into `local-stack/*.yml`, which exist to be copied around.
+`avant-basic/config/initializers/templateflow_engine_client.rb`.
+
+Put both in `.env.local`, which is gitignored and sourced automatically by
+`local-stack/restore.sh`:
 
 ```bash
-export AVANT_TEMPLATES_HOST=templateflow.ocala.k8s.dev.global.avant.com
-export AVANT_TEMPLATES_API_KEY="$(vault kv get -field=value avant/dev/basic/secrets/AVANT_TEMPLATES_API_KEY)"
+cp .env.local.example .env.local && chmod 600 .env.local
+kubectl -n templateflow-asm exec deploy/templateflow-01 -- printenv STAGING_API_KEY
+# paste into AVANT_TEMPLATES_API_KEY=
 ```
 
-Host verified reachable: `GET https://templateflow.ocala.k8s.dev.global.avant.com/api/v1/templates`
-returns 401 without a key, which is what `TemplateflowEngine::Client::Send` maps to "your token is
-invalid". A 401 after setting the key means the key is wrong, not the host. The Vault path follows
-the platform convention and was not confirmed readable during setup - if it is not there, the key is
-whatever the deployed ocala `basic` has in its environment.
+The key is not in Vault and does not need to be. `avant-templates/app/api/root.rb:17-18` accepts two
+bare keys straight from the TemplateFlow pod's own environment - `ENV['API_KEY']` for the prod legacy
+user and `ENV['STAGING_API_KEY']` for the staging one - and `lazily_create_legacy_api_user!` creates
+the admin user and its `ApiKey` on first use. **Take `STAGING_API_KEY`.** Using `API_KEY` would create
+the *prod* legacy admin user inside the staging database.
 
-("templateflow-01", named in CSRV-5299's testing plan, is a pod name, not a hostname.)
+The credential is never written into `local-stack/*.yml`. The override names
+`AVANT_TEMPLATES_API_KEY` with no value, so Compose passes it through from the shell that ran `up`.
+Env vars are baked at container creation, so after changing it:
+
+```bash
+docker compose -p basic-csrv-5300 up -d --force-recreate web sidekiq   # basic only, never CRM
+docker compose -p basic-csrv-5300 exec web sh -c 'printenv AVANT_TEMPLATES_HOST; printenv AVANT_TEMPLATES_API_KEY | wc -c'
+```
+
+A character count of 1 means the value never reached the container, and every render will 401.
+
+### Which TemplateFlow
+
+There is no "dev" TemplateFlow. `avant-templates/.avant/terraform/.global-dev.tfvars:1` sets
+`environment_override = "stg"`, so the global-dev account's instance **is** the staging deployment;
+the `avant-stg-shared-app-*` names are that same stack's legacy AWS resources (Aurora, Redis), not a
+second environment. The EKS deployment is `templateflow-01` in namespace `templateflow-asm`
+(`locals.tf:3`) on cluster `glbdev-use2-eks-ocala`, reachable at
+`templateflow.ocala.k8s.dev.global.avant.com`.
+
+Host verified: `GET /api/v1/templates` returns 401 without a key, which is what
+`TemplateflowEngine::Client::Send` maps to "your token is invalid". A 401 *after* setting the key
+means the key is wrong, not the host.
+
+("templateflow-01" appears in CSRV-5299's testing plan as though it were a hostname. It is a
+deployment name.)
 
 ## Environment traps that cost hours
 
