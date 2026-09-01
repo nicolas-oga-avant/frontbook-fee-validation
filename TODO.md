@@ -16,8 +16,8 @@ Nothing below matters if this does not reproduce. Do it first, every time the en
 - [ ] `local-stack/restore.sh` runs clean against the worktrees with `AVANT_ROOT` set
 - [ ] All three stacks up; CSP loads at `localhost:4000/us/` with no `login.ejs` error
 - [ ] The `zzz_local_*` initializers confirmed **loaded from the boot log**, not just present on disk
-- [ ] Baseline CMA for `0122` re-extracted and byte-comparable to `evidence/baseline/cma_0122_local.html`
-- [ ] Template Version (`git_sha_version`) readable from a render, and recorded
+- [x] Baseline CMA for `0122` re-extracted. **Compare fee content, not bytes** - the baseline came from a different TemplateFlow instance and differs by an Overlimit Fee row (FINDINGS #20)
+- [x] Template Version investigated: `git_sha_version` is **null** on Ocala (FINDINGS #18). Content SHA256 is the fallback signal
 
 ## Phase 1 - console phase
 
@@ -26,7 +26,7 @@ Deterministic, no browser. Wrap this first.
 - [x] Manifest schema defined (`data/manifest.schema.json`); seeding from `data/run-matrix.csv` with a content hash still to implement
 - [ ] Manifest read/write with a lock, write-through on every stage transition
 - [ ] Append-only Attempt log; status derived from the newest Attempt
-- [ ] `issue!` -> `LocalCmaStub.prepare!` -> render, driven from a script
+- [ ] `issue!` -> `LocalCmaStub.prepare!` -> render, driven from a script. **Use `CardmemberAgreementLetter.render_pdf` on stored `template_variables`** - the other two render paths both fail locally (FINDINGS #19)
 - [ ] Every handle captured by explicit id. **Audit the codebase for `.last` and remove every one**
 - [ ] `LocalCmaStub.revert!` in a finally-block
 - [ ] Database identity recorded on each Attempt
@@ -102,9 +102,11 @@ Deterministic, no browser. Wrap this first.
 
 - [ ] File the one-line `raw_test_data` defect in `avant-basic` (FINDINGS #3). It blocks the six
       backbook MLA Runs too, so it is not resolved by any other dependency
-- [ ] Verify `templateflow.ocala.k8s.dev.global.avant.com` has avant-templates#74's sha synced
-      (CSRV-5219 is the readiness dependency). Host is confirmed live; the API key is not yet in
-      hand. **If the sha is not synced, AC 2 stays blocked regardless of everything else**
+- [x] ~~Verify Ocala has avant-templates#74's sha synced~~ **Answered 2026-09-01: it does not, and
+      cannot yet.** Ocala's CMA template is not git-backed at all (FINDINGS #18). CSRV-5219 (staging
+      sync) has not run. **AC 2 is blocked on Ocala until it does** - this is now the single
+      critical-path dependency for the frontbook half of the Campaign
+- [ ] Chase CSRV-5219. Until it lands, only the 14 backbook Runs can produce final evidence
 - [ ] `roll_pricing_strategy_configuration` still rolls 100% to `0120`, so no application is ever
       *organically* assigned a frontbook code. Does not block URL-driven testing. Flagged on CSRV-5297
 - [ ] CSRV-5823 tracks the deferred prd Confetti promotion

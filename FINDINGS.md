@@ -494,3 +494,60 @@ CSRV-5301 / CSRV-5302 codes.
 content against them defeats the point of the exercise. Either accept the nil margin for fixed-rate
 runs, or drive the application through real decisioning rather than the dashboard's
 `Approve Product and Skip Ver` dev tool.
+
+## 18. Ocala TemplateFlow is not git-backed, so there is no Template Version to read
+
+Verified 2026-09-01 against `templateflow.ocala.k8s.dev.global.avant.com`, template
+`Letter - Cardmember Agreement (CMA) - Key: 1` (`0b480903-330d-42cd-9cb5-7cff942c44f9`), which is
+what `credit_card_cardmember_agreement_1` resolves to:
+
+```
+git_sha_version: null
+source_file:     null
+updated_at:      2026-05-20
+status:          draft
+```
+
+CSRV-4904 extracted the CMA templates to git-backed `.liquid` files and set `source_file` /
+`git_sha_version`, and it is merged - but **only in the repo**. Ocala's records predate it and carry
+neither field. That sync is CSRV-5219, and it has not run.
+
+Two consequences:
+
+1. **AC 2 cannot pass on Ocala today.** The stored content does not contain `cma_late_fee_initial`,
+   `cma_late_fee_subsequent` or `cma_foreign_transaction_fee`, so avant-templates#74's content is not
+   there regardless of whether the PR merges.
+2. **The Epoch signal defined in `DESIGN.md` decision 5 does not exist on this instance.** Falling
+   back to a SHA256 of the template `content` returned by
+   `GET /api/v1/templates/<uuid>`, which needs no git-backing. As of 2026-09-01 that is
+   `d163a2fe6060b1e2b6363091cf5dcbca89817c3e01da0d8d70e75c74efc112b1` (189,835 bytes).
+
+Prefer `git_sha_version` once CSRV-5219 lands; record both.
+
+## 19. Only one of the three CMA render paths works locally
+
+Three entry points exist. Two fail for unrelated reasons, and neither failure mentions the CMA:
+
+| Path | Result |
+| --- | --- |
+| `product.send_email!(:credit_card_product_overview, ...)` - the issuance path | **422 from TemplateFlow: `Missing Variables: first_name`.** It fails rendering the *email subject* (`send_email.rb:378 subject_from_templateflow`), before the CMA attachment is touched |
+| `interface.csp_requested_cardmember_agreement_log` | **`DataSourceBuildError: annual_membership_fee_amount must be a float`.** It calls `generate_cardmember_agreement_inputs`, which needs the product decision a locally-approved application does not have (FINDINGS #17) |
+| `CardmemberAgreementLetter.render_pdf(cardmember_agreement_log:, template_name:)` on a log with **stored** `template_variables` | **Works** |
+
+So a re-render must reuse an existing log's `template_variables` rather than regenerate them. Copy
+them onto a new `CardmemberAgreementLog` and call `render_pdf` directly.
+
+Note the stored variables from a pre-#5928 run do **not** contain the three `cma_*` fee keys, so such
+a render exercises the template's defaults. That is correct for a backbook expectation and is *not*
+evidence about frontbook behaviour.
+
+## 20. The baseline render came from an older template than Ocala serves
+
+Re-rendering account 5211958 against Ocala reproduces the baseline's fee content exactly - $28,
+$39, no FX paragraph, and the only `3%` is the cash advance sentence - but the documents differ:
+41,032 vs 39,589 characters of text. The baseline carries an **Overlimit Fee** row
+(`Late Fee Overlimit Fee Up to $39 None`) that Ocala's template does not have at all.
+
+So `evidence/baseline/cma_0122_local.html` was rendered against a *different* TemplateFlow instance
+than the one the stack now points at. Compare **fee content**, never bytes, when checking that a
+baseline reproduces.

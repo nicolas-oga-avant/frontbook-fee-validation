@@ -95,7 +95,13 @@ transaction disclosures are gated, on the variable being present.
 
 Since CSRV-4904 the CMA templates are git-backed (`app/templates/cma/agreement_base.liquid`, one
 file, five variants as internal Liquid conditionals), each carrying a `git_sha_version`. So the
-Epoch is exactly that sha, read from the render. It is detected, never configured: a human-set epoch
+Epoch is exactly that sha, read from the render.
+
+**Except on Ocala today, where it is null.** CSRV-4904 landed in the repo but the staging sync
+(CSRV-5219) has not run, so Ocala's CMA records carry neither `git_sha_version` nor `source_file` -
+see FINDINGS #18. Until that sync lands, the Epoch signal is a SHA256 of the template `content`
+returned by `GET /api/v1/templates/<uuid>`, which needs no git-backing. Record both fields; prefer
+`git_sha_version` whenever it is present. It is detected, never configured: a human-set epoch
 flag is wrong precisely in the week the change lands.
 
 **Epoch detection must never read a fee amount.** "Does the CMA say $30" is the assertion itself;
