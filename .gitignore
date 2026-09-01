@@ -1,0 +1,9 @@
+# Campaign output: regenerated per run, not source
+evidence/runs/
+runs/
+*.log
+
+# Local scratch
+.DS_Store
+__pycache__/
+*.pyc

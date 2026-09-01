@@ -1,0 +1,36 @@
+# Untracked local override: CCAPI wired to LOCAL basic and DEV's FDR gateway.
+#
+#   docker compose -p ccapi-csrv-5300 up -d web
+#
+# Rationale for each entry is a failure that actually happens without it.
+services:
+  minio:
+    # compose.yml pins public.ecr.aws/bitnami/minio, which no longer exists (Bitnami
+    # removed their public ECR catalog); web then crashes at boot on S3 bucket setup.
+    # Do NOT substitute basic's 2023 Artifactory mirror - it cannot read a minio_data
+    # volume written by a newer server (decodeXLHeaders: Unknown xl header version 3).
+    image: minio/minio:latest
+    command: server /data
+
+  web: &ccapi-env
+    environment:
+      # Point CCAPI at LOCAL basic. Dev CCAPI's Vault value is
+      # https://basic-mp.ocala... which is the wrong database for a customer created
+      # against local basic. Container -> host, so host.docker.internal, not localhost.
+      AVANT_BASIC_HOST_URL: http://host.docker.internal:5001
+      # STUB_FDR_API is spec-only and never read at runtime, so CCAPI always dials FDR
+      # for real. Dev's gateway needs no VPN and no auth token.
+      FDR_GATEWAY_URL: https://fdr-gateway-asm.ocala.k8s.dev.global.avant.com
+      STUB_FDR_API: "false"
+      STUB_AB_API: "false"
+      # Confetti must match what local basic reads, or the two disagree about which
+      # pricing strategies exist.
+      CONFETTI_ENV: dev
+      # NOTE the name: CCAPI reads CONFETTI_URL, avant-basic reads CONFETTI_URI. There is no
+      # default, so without this CCAPI never reaches Confetti and falls back to in-repo
+      # constants, which reject the new frontbook codes at onboarding with
+      # "pricing_strategy_code does not have a valid value".
+      CONFETTI_URL: https://confetti.boston.k8s.prd.app.avant.com
+
+  sidekiq:
+    <<: *ccapi-env

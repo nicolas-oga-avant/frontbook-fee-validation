@@ -1,0 +1,26 @@
+# Untracked local override: basic wired to the LOCAL CCAPI.
+#
+#   docker compose -p basic-csrv-5300 up -d web sidekiq
+#
+services:
+  web: &basic-env
+    environment:
+      # .env.development sets http://credit-card-api-web-1:7100, which is wrong twice
+      # over: it assumes the legacy global ab-net (per-project networks break the DNS)
+      # and CCAPI listens on 3000 inside its container - 7100 is only the published
+      # host port. The failure surfaces as CreditCardApiTimeoutError in ~10ms, a DNS
+      # miss dressed up as a timeout.
+      CREDIT_CARD_API_ENDPOINT: http://host.docker.internal:7100
+      # Must match CCAPI's CONFETTI_ENV, and is what makes the new frontbook pricing
+      # strategies visible at all (see FINDINGS #12).
+      CONFETTI_ENV: dev
+      # Enables config/initializers/zzz_local_transunion_mock.rb. Without a TU mock,
+      # every local card application declines with missing_transunion_report.
+      MOCK_TRANSUNION: "1"
+      # .env.development sets this but the compose web service never loads that
+      # file, so Avant::Env.enable_mock_services? is false and BOTH mock
+      # initializers silently skip. Set it explicitly.
+      ENABLE_MOCK_SERVICES: "1"
+
+  sidekiq:
+    <<: *basic-env

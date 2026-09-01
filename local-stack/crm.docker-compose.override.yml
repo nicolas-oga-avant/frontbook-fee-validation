@@ -1,0 +1,42 @@
+# Untracked local override: point CRM/CSP at the LOCAL basic.
+#
+# Points CSP at the LOCAL basic so it shares a database with the local apply flow.
+# (Earlier this targeted ocala `basic`; swap the URL back if you want the deployed one.)
+#
+# Bring it up with a ticket-scoped project name so it cannot collide with other
+# sessions' compose projects:
+#
+#   docker compose -p crm-csrv-5300 up -d web
+#   docker compose -p crm-csrv-5300 exec web sh -c 'cd /app && yarn webpack'   # ~53s
+#
+# The second step is NOT optional. Dockerfile.dev runs only `yarn build` (tsc); the
+# client bundle comes from `yarn webpack`. Without it every request 500s with
+# `Failed to lookup view "login.ejs"` after the server cheerfully logs "Listening on
+# port 3000". dist/clientBuild lives in the container's writable layer, not a volume,
+# so ANY `up --force-recreate` or rebuild wipes it and it must be re-run.
+#
+services:
+  web:
+    # Dockerfile.dev installs an amd64-only wkhtmltopdf .deb that dpkg rejects on arm64.
+    platform: linux/amd64
+    # The web service has no env_file of its own and `yarn start` is plain
+    # `node dist/server`, so .env.development is never read without this.
+    env_file: .env.development
+    environment:
+      # Tenant URLs are separate vars and CSP is browsed at /us/, so API_URL_US is the
+      # one that actually matters; the rest are set to keep the tenants consistent.
+      API_URL_US: http://host.docker.internal:5001
+      API_URL_AVANT: http://host.docker.internal:5001
+      API_URL_TD: http://host.docker.internal:5001
+      API_URL_ELOAN: http://host.docker.internal:5001
+      # Against a LOCAL basic the password-login path works: CRM's
+      # AVANT_API_SHARED_SECRET and basic's CRM_SHARED_KEY both default to abc123.
+      # That removes the avantpreview Okta gate, which needs a human every session.
+      ENABLE_OKTA_LOGIN: "0"
+      DISABLE_PASSWORD_LOGIN: "0"
+      LOGIN_ENDPOINT: admin/api/v1/login
+      AVANT_API_SHARED_SECRET: abc123
+    ports:
+      # OKTA_CALLBACK_URL is pre-registered as http://localhost:4000/... on the
+      # avantpreview Okta app, so the host port must be 4000 or the redirect fails.
+      - "4000:3000"

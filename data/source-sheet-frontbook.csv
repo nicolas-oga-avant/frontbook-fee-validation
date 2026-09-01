@@ -1,0 +1,19 @@
+New Pricing Strategies,Replaces [Daily Compunding Strategies],UUID,1st Year Annual Fee,Annual vs Monthly,2nd Year Annual Fee,Annual vs Monthly,Base APR,Min APR,Max APR,Fixed vs Variable,Daily vs Monthly Compounding ,MLA,1st LF,2nd LF,FTFee,RPF,Pmt Prot
+0122,0120,f7ca3250-5403-40f1-9627-8e274349aff7,               0.00,N/A,0.00,N/A,35.990,0.000, 35.990,Fixed,Daily,No,$30 ,$41 ,3%,$25 ,Yes
+0123,0121,991344ab-7889-4333-ae4c-5921b1c30540,               0.00,N/A,0.00,N/A,29.990,0.000, 29.990,Fixed,Daily,No,$30 ,$41 ,3%,$25 ,Yes
+3303,3302,25476fa2-49a5-4647-bd43-71f234da6f43,               0.00,N/A,39,Annual,35.990,0.000, 35.990,Fixed,Daily,No,$30 ,$41 ,3%,$25 ,Yes
+3M33,3M32,N/A,               0.00,N/A,39,Annual,35.990,0.000, 35.990,Fixed,Daily,Yes,$30 ,$41 ,3%,$25 ,Yes
+3220,3219,91e55625-79a9-41d2-8884-b283059ad6c1,              39.00,Annual,39,Annual,35.990,0.000, 35.990,Fixed,Daily,No,$30 ,$41 ,3%,$25,Yes
+3M90,3M89,N/A,              39.00,Annual,39,Annual,35.990,0.000, 35.990,Fixed,Daily,Yes,$30 ,$41 ,3%,$25,Yes
+5217,5216,748a19ea-766c-4d11-bb1d-373103b3f921,              59.00,Annual,59,Annual,35.990,0.000, 35.990,Fixed,Daily,No,$30 ,$41 ,3%,$25,Yes
+5M87,5M86,N/A,              59.00,Annual,59,Annual,35.990,0.000, 35.990,Fixed,Daily,Yes,$30 ,$41 ,3%,$25 ,Yes
+7213,7212,9968af49-3abe-46fe-be8e-27de98d38881,              75.00,Annual,75,Annual,35.990,0.000, 35.990,Fixed,Daily,No,$30 ,$41 ,3%,$25,Yes
+7M83,7M82,N/A,              75.00,Annual,75,Annual,35.990,0.000, 35.990,Fixed,Daily,Yes,$30 ,$41 ,3%,$25,Yes
+7105,7104,61545cc1-44c6-41d0-93ee-04e151fc90ea,              75.00,Annual,99,Annual,35.990,0.000, 35.990,Fixed,Daily,No,$30 ,$41 ,3%,$25,Yes
+7M95,7M94,N/A,              75.00,Annual,99,Annual,35.990,0.000, 35.990,Fixed,Daily,Yes,$30 ,$41 ,3%,$25,Yes
+9004,9003,111a70dd-a7d1-4af1-a6fb-b9cb263d2cb3,125.00,Annual,10.42,Monthly,35.990,0.000, 35.990,Fixed,Daily,No,$30 ,$41 ,3%,$25,Yes
+9M04,9M03,N/A,125.00,Annual,10.42,Monthly,35.990,0.000, 35.990,Fixed,Daily,Yes,$30 ,$41 ,3%,$25,Yes
+,7312,,              75.00,Annual,6.25,Monthly,35.990,0.000, 35.990,Fixed,Daily,No,$28 ,$39 ,,$25,Yes
+,7M32,,              75.00,Annual,6.25,Monthly,35.990,0.000, 35.990,Fixed,Daily,Yes,$28 ,$39 ,,$25,Yes
+,7412,,              75.00,Annual,8.25,Monthly,35.990,0.000, 35.990,Fixed,Daily,No,$28 ,$39 ,,$25,Yes
+,7M42,,              75.00,Annual,8.25,Monthly,35.990,0.000, 35.990,Fixed,Daily,Yes,$28 ,$39 ,,$25,Yes

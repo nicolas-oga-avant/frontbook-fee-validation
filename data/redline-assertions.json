@@ -1,0 +1,68 @@
+{
+  "source": "/Users/ichigolas/Source/avant/.tickets/CSRV-5300/reference/redline-LGL-7960-schumer-box-and-cma.docx",
+  "assertions": [
+    {
+      "id": "summary_ftf_row-introductory_annual_fee",
+      "kind": "summary_ftf_row",
+      "summary_box": "introductory_annual_fee",
+      "new_codes_expect": "{foreign_transaction_fee}% of each foreign transaction in U.S. dollars.",
+      "old_codes_expect": "None",
+      "old_codes_expect_source": "template gating (not derivable from the redline)",
+      "new_codes_expect_literal": "3% of each foreign transaction in U.S. dollars."
+    },
+    {
+      "id": "summary_late_fee_ceiling-introductory_annual_fee",
+      "kind": "summary_late_fee_ceiling",
+      "summary_box": "introductory_annual_fee",
+      "new_codes_expect": "Up to ${late_fee_subsequent}",
+      "old_codes_expect": "Up to ${late_fee_subsequent}",
+      "old_codes_expect_source": "redline pre-change text",
+      "new_codes_expect_literal": "Up to $41"
+    },
+    {
+      "id": "summary_ftf_row-all_other",
+      "kind": "summary_ftf_row",
+      "summary_box": "all_other",
+      "new_codes_expect": "{foreign_transaction_fee}% of each foreign transaction in U.S. dollars.",
+      "old_codes_expect": "None",
+      "old_codes_expect_source": "template gating (not derivable from the redline)",
+      "new_codes_expect_literal": "3% of each foreign transaction in U.S. dollars."
+    },
+    {
+      "id": "summary_late_fee_ceiling-all_other",
+      "kind": "summary_late_fee_ceiling",
+      "summary_box": "all_other",
+      "new_codes_expect": "Up to ${late_fee_subsequent}",
+      "old_codes_expect": "Up to ${late_fee_subsequent}",
+      "old_codes_expect_source": "redline pre-change text",
+      "new_codes_expect_literal": "Up to $41"
+    },
+    {
+      "id": "late_fee_paragraph",
+      "kind": "late_fee_paragraph",
+      "summary_box": null,
+      "new_codes_expect": "Late Fee. If you do not pay the Total Minimum Payment Due on your statement by the Payment Due Date, we will charge you a late fee. The fee may be up to ${late_fee_initial}, unless you incurred a late fee during the prior six billing periods. If you did, the fee may be up to ${late_fee_subsequent}. This fee will not exceed the amount permitted by law.",
+      "old_codes_expect": "Late Fee. If you do not pay the Total Minimum Payment Due on your statement by the Payment Due Date, we will charge you a late fee. The fee may be up to ${late_fee_initial}, unless you incurred a late fee during the prior six billing periods. If you did, the fee may be up to ${late_fee_subsequent}. This fee will not exceed the amount permitted by law.",
+      "old_codes_expect_source": "redline pre-change text",
+      "new_codes_expect_literal": "Late Fee. If you do not pay the Total Minimum Payment Due on your statement by the Payment Due Date, we will charge you a late fee. The fee may be up to $30, unless you incurred a late fee during the prior six billing periods. If you did, the fee may be up to $41. This fee will not exceed the amount permitted by law."
+    },
+    {
+      "id": "ftf_disclosure_paragraph",
+      "kind": "ftf_disclosure_paragraph",
+      "summary_box": null,
+      "new_codes_expect": "Foreign Transaction Fee: If you make a transaction in a foreign currency, a purchase outside of the United States, or a transaction that is processed outside of the United States (including, for example, online purchases from a merchant located outside of the U.S.), we will charge a foreign transaction fee of {foreign_transaction_fee}% of the transaction amount in U.S. dollars. The foreign transaction fee will be added to the transaction amount and will be included in your Account balance. Should an original foreign transaction be reversed or returned, the associated foreign transaction fee shall be refunded and no further foreign transaction fees will be levied for that specific return.",
+      "old_codes_expect": null,
+      "old_codes_expect_source": "template gating (not derivable from the redline)",
+      "new_codes_expect_literal": "Foreign Transaction Fee: If you make a transaction in a foreign currency, a purchase outside of the United States, or a transaction that is processed outside of the United States (including, for example, online purchases from a merchant located outside of the U.S.), we will charge a foreign transaction fee of 3% of the transaction amount in U.S. dollars. The foreign transaction fee will be added to the transaction amount and will be included in your Account balance. Should an original foreign transaction be reversed or returned, the associated foreign transaction fee shall be refunded and no further foreign transaction fees will be levied for that specific return."
+    },
+    {
+      "id": "foreign_transactions_paragraph",
+      "kind": "foreign_transactions_paragraph",
+      "summary_box": null,
+      "new_codes_expect": "Foreign Transactions: Transactions in a foreign currency are converted to U.S. dollars by our network providers (Visa and MasterCard) using their procedures in effect at the time the transaction is processed. Currently, they use a government-mandated or wholesale rate. These procedures may change without notice. The conversion rate you get may differ from the rate on the transaction or post date, and from the rate our network provider gets. Any conversion rate costs resulting from our network provider\u2019s procedures will be reflected in the transaction amount posted to your Account. A merchant or other third party may convert a transaction into U.S. dollars or another currency, using a rate they select, before sending it to our network provider.",
+      "old_codes_expect": "Foreign Transactions: Transactions in a foreign currency are converted to U.S. dollars by our network providers (Visa and MasterCard) using their procedures in effect at the time the transaction is processed. Currently, they use a government-mandated or wholesale rate. These procedures may change without notice. The conversion rate you get may differ from the rate on the transaction or post date, and from the rate our network provider gets. A merchant or other third party may convert a transaction into U.S. dollars or another currency, using a rate they select, before sending it to our network provider.",
+      "old_codes_expect_source": "redline pre-change text",
+      "new_codes_expect_literal": "Foreign Transactions: Transactions in a foreign currency are converted to U.S. dollars by our network providers (Visa and MasterCard) using their procedures in effect at the time the transaction is processed. Currently, they use a government-mandated or wholesale rate. These procedures may change without notice. The conversion rate you get may differ from the rate on the transaction or post date, and from the rate our network provider gets. Any conversion rate costs resulting from our network provider\u2019s procedures will be reflected in the transaction amount posted to your Account. A merchant or other third party may convert a transaction into U.S. dollars or another currency, using a rate they select, before sending it to our network provider."
+    }
+  ]
+}
