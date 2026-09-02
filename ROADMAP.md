@@ -21,10 +21,19 @@ amounts on a real rendered agreement.
 
 ### What every Run renders against
 
-**Production TemplateFlow**, picking up the **latest draft** of the cardmember agreement template.
-No patch is needed and preview mode keeps it safe - see
-`docs/adr/0002-render-drafts-against-production-templateflow.md`. Provenance is the
-`template_version_uuid` the render returns; no `git_sha_version` exists anywhere yet (FINDINGS #18).
+**Production TemplateFlow**, picking up the **latest draft** of the **consolidated** cardmember
+agreement - template 9658, `5d5b0b5c-9e69-4bb4-aaa5-68581f7e7c93`, currently v7 draft. Preview mode
+keeps it safe: see `docs/adr/0002-render-drafts-against-production-templateflow.md`.
+
+It is specifically the consolidated template, not `credit_card_cardmember_agreement_1`, and the
+difference is load-bearing - `_1` has none of the fee variables, so a Run that renders it reports
+backbook amounts no matter which pricing strategy it was built for (FINDINGS #21). Reaching the
+consolidated template locally **does** need a patch: `show_consolidated_cma?` is false by default
+because the Optimizely flag is stubbed and `CONSOLIDATED_CMA_CUTOFF_DATE` is unset.
+
+Provenance is the Template ID **and** the `template_version_uuid` the render returns - the version
+alone does not say which template it is a version of. No `git_sha_version` exists anywhere yet
+(FINDINGS #18).
 
 ## Dependency state as of 2026-09-02
 
