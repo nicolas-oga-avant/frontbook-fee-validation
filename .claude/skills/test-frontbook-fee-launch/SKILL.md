@@ -165,7 +165,7 @@ OptimizelyInitializer.setup!
 
 cca = CreditCardAccount.find(<cca_id>)
 cca.issue!                       # => true. Real onboarding, servicing account, agreement log
-LocalCmaStub.prepare!(cca.id)    # fills the Fiserv-only fields
+LocalCmaStub.prepare!(cca.id)    # Fiserv-only fields, and forces the consolidated CMA
 
 # Sanity, before trusting anything downstream:
 raise "wrong strategy" unless cca.current_cardholder_pricing_strategy_identifier.to_s == "<CODE>"
@@ -174,6 +174,18 @@ raise "wrong strategy" unless cca.current_cardholder_pricing_strategy_identifier
 `LocalCmaStub` (`local-stack/zzz_local_cma_stub.rb`) refuses to run on an unissued account and
 cross-checks the pricing strategy against the decision path tag - read its header. `revert!` belongs
 in a finally-block, not on the happy path, so a crashed Run leaves no pinned account.
+
+`prepare!` also tags the account `needs_consolidated_cma`, and `verify!` raises unless the resolved
+template is `:credit_card_cardmember_agreement_consolidated`. That check is not ceremony: the fee
+variables exist only on the consolidated agreement, and `credit_card_cardmember_agreement_1` still
+hardcodes `$28`/`$39`, so a Run that renders `_1` reports backbook amounts for **any** pricing
+strategy and nothing errors (FINDINGS #21). If it raises, check the boot log for
+`[local] LocalConsolidatedCma` - the tag does nothing without
+`zzz_local_consolidated_cma.rb` loaded.
+
+Note the ordering with `OptimizelyInitializer.setup!` above: with a live Optimizely client the real
+`consolidated_cma_enabled?` may well return false, since the flag is not on for a local box. The
+per-account override short-circuits ahead of it, so the tag wins either way.
 
 **Never use `.last` to find the agreement log.** An account accumulates several, and picking the
 wrong one silently validates a different document. Capture the id from `issue!`.
