@@ -1,10 +1,12 @@
 # Render against production TemplateFlow, in preview mode
 
-**Supersedes ADR 0001.**
+**Supersedes an earlier decision that forbade production renders outright** (ADR 0001, since
+removed; recoverable from git history).
 
-ADR 0001 forbade rendering against production TemplateFlow on the grounds that rendering is
-`POST /documents`, and therefore a write that would leave synthetic documents in a production store.
-That is true of the general path and false of the one we use.
+The earlier reasoning was that rendering is `POST /documents`
+(`templateflow-engine/lib/templateflow_engine/client/endpoint/create_document.rb`), and therefore a
+write that would leave synthetic documents, under customers who do not exist, in a production
+document store. That is true of the general path and false of the one we use.
 
 `avant-templates/app/api/documents.rb:8` documents `preview` as a "Flag to prevent saving a test doc
 to prod db", and `app/services/generate_document.rb` returns `id: nil` after calling

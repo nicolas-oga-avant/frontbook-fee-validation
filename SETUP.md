@@ -2,7 +2,20 @@
 
 The whole chain only closes locally. Dev/Ocala can drive the apply flow but cannot issue a card:
 Fiserv rejects the address, and the overnight onboarding batch is Fiserv's, not ours, so there is no
-way to force it. See FINDINGS #3 and the root `CLAUDE.md`.
+way to force it. See FINDINGS #3.
+
+## The services this touches
+
+The first three run locally, from the checkouts below. The last two are remote - basic reaches
+TemplateFlow over HTTP - and the paths are for reading code, not for running anything.
+
+| Service | Path | What it does here |
+| --- | --- | --- |
+| `avant-basic` | `../avant-basic` | Ruby 2.7 / Rails 5.0. Owns the application, decisioning, pricing strategy resolution, and CMA rendering. The centre of this work |
+| `credit-card-api` | `../credit-card-api` | Ruby 2.7 / Rails 5.2. Card accounts, onboarding to Fiserv |
+| `crm` | `../crm` | TypeScript / React. The CSP admin portal, used for one assertion point |
+| `avant-templates` | `../avant-templates` | The TemplateFlow service. Stores and renders the CMA. **Not a gem** - basic talks to it over HTTP |
+| `templateflow-engine` | `../templateflow-engine` | The client gem basic uses to reach TemplateFlow |
 
 ## Prerequisites
 
@@ -92,19 +105,13 @@ A character count of 1 means the value never reached the container, and every re
 
 ### Why production, and why this is safe
 
-Renders go out with `preview: true` and `allow_unapproved: true`, both defaulted from
-`!Avant::Env.acts_as_prod?` in `avant-basic/lib/avant/templateflow/create_document.rb:18-19`. So a
-local stack picks up the latest **draft** of the template - the artifact actually under test, at
-`https://templateflow.avant.com/templates/9658/edit` - and preview keeps it from persisting
-anything: TemplateFlow describes the flag as preventing a test doc being saved to the prod db, and
-`GenerateDocument` returns `id: nil`. See `docs/adr/0002`.
-
-Staging is not a usable target: file-backed templates ship after the fee launch, so there is nothing
-synced there to validate (FINDINGS #18).
+Renders go out in preview mode, which persists nothing, and pick up the latest **draft** - the
+artifact actually under test. Staging is not a usable target: file-backed templates ship after the
+fee launch, so there is nothing synced there to validate (FINDINGS #18). The full argument is in
+`docs/adr/0002-render-drafts-against-production-templateflow.md`.
 
 **Assert preview is on rather than assuming it.** Anything that makes this stack `acts_as_prod?`
-flips both flags off silently - the render stops picking up the draft and starts writing to
-production.
+flips it off silently - the render stops picking up the draft and starts writing to production.
 
 ## Environment traps that cost hours
 
@@ -113,9 +120,35 @@ production.
 | CRM client bundle | every request 500s `Failed to lookup view "login.ejs"` after logging "Listening on port 3000" | `yarn webpack` in the container. Any `--force-recreate` wipes it - it lives in the writable layer, not a volume |
 | CCAPI Confetti | onboarding rejected: `pricing_strategy_code does not have a valid value` | CCAPI reads `CONFETTI_URL`, basic reads `CONFETTI_URI`. No default |
 | `ENABLE_MOCK_SERVICES` | mocks silently never register | `.env.development` is not loaded by the compose web service; set it explicitly |
-| Okta | human gate every session | Against a local basic use password login (`abc123` both sides). Only a remote basic needs Okta |
+| Okta | human gate every session | Against a local basic use password login (`abc123` both sides). Only a remote basic needs Okta, and `avantpreview.oktapreview.com` is a different org from production, so there is no session to reuse and an agent cannot complete it |
 | `rails runner` | `undefined method 'optimizely_client'` | Not a console. Call `OptimizelyInitializer.setup!` first |
 | Cold start | health check concludes basic is down | Local basic answers a cold request in ~7s. Use a generous timeout |
+| CRM ports | another project holding 3000 collides | base compose binds `3000:3000` and Compose **appends** ports rather than replacing them, so the container ends up on both 3000 and 4000 |
+
+Chrome's debug port has its own trap that is not diagnosable by curl - see FINDINGS #7 before
+concluding the harness cannot connect.
+
+### Platform facts that only matter if you leave local
+
+You should not, but if you do:
+
+- **Ocala hosts two Basic deployments**, `basic` and `basic-mp`, with separate databases and
+  disjoint data. A customer created in one is invisible in the other. The deployed dev CSP points at
+  `basic-mp`.
+- **Dev CCAPI points at `basic-mp`** while ocala `basic` points at dev CCAPI, so the dev triangle is
+  crossed. Use `Persistence::Customer.local_find`, never `find`, when inspecting dev data.
+- **CCAPI stores no customer PII** by design. Do not expect to verify an address there.
+- **Dev-utils accounts are not onboarded to Fiserv.** Their `first_data_account_reference` is a
+  fabricated Base64 UUID; real ones look like `C26220125456184007040081`. Any FDR call for such an
+  account fails with a 500 that says nothing about the code under test.
+- **Deployed dev basic reads prd Confetti** unless `CONFETTI_ENV=dev` is set, so the new codes are
+  invisible and the apply URL bounces to `/strategy_param_error` (FINDINGS #12).
+- **Non-prod TemplateFlow is `stg`, not `dev`.** The global-dev account's deployment sets
+  `environment_override = "stg"`, so anything reasoning about a "dev TemplateFlow" is reasoning
+  about something that does not exist.
+- **Vault path convention**: `avant/${account_environment}/${service_name}/secrets/<KEY>`, one key
+  per sub-path with a single `value` field. Not needed for this work - the one credential involved
+  is the production TemplateFlow API key, and it is not in Vault.
 
 ## The local patches
 

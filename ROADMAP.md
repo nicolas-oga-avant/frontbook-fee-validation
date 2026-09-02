@@ -1,7 +1,7 @@
 # ROADMAP - the objective, the two phases, and what is left
 
-The single planning document for this project. `DESIGN.md` is how, `AGENTS.md` is the rules,
-`FINDINGS.md` is what goes wrong.
+The single planning document for this project, and the only place dated status lives. `DESIGN.md` is
+how, `AGENTS.md` is the rules, `FINDINGS.md` is what goes wrong.
 
 Tick items as you complete them, in the same edit as the work. **Do not tick an item you have not
 verified end to end.** If an item turns out to be wrong, strike it (`~~like this~~`) and say why
@@ -21,16 +21,27 @@ amounts on a real rendered agreement.
 
 ### What every Run renders against
 
-**Production TemplateFlow**, `https://templateflow.avant.com`, picking up the **latest draft** of the
-cardmember agreement template (`/templates/9658/edit`).
+**Production TemplateFlow**, picking up the **latest draft** of the cardmember agreement template.
+No patch is needed and preview mode keeps it safe - see
+`docs/adr/0002-render-drafts-against-production-templateflow.md`. Provenance is the
+`template_version_uuid` the render returns; no `git_sha_version` exists anywhere yet (FINDINGS #18).
 
-No patch is needed for this: `avant-basic/lib/avant/templateflow/create_document.rb:18-19` defaults
-both `preview` and `allow_unapproved` to `!Avant::Env.acts_as_prod?`, so a local stack already
-renders unapproved drafts, and preview keeps the render from persisting anything. See
-`docs/adr/0002`.
+## Dependency state as of 2026-09-01
 
-File-backed templates ship **after** this launch, so no `git_sha_version` exists anywhere yet
-(FINDINGS #18). Provenance is the `template_version_uuid` the render returns.
+| Dependency | State |
+| --- | --- |
+| avant-basic#5928 (CSRV-5298, `cma_fee_terms`) | **Merged** 2026-08-28 into `main` |
+| avant-templates#74 (CSRV-5299, CMA content) | **Open, draft**, base `main` |
+| CSRV-4904 (template extraction to git-backed Liquid) | Merged |
+| Confetti `basic.pricing_strategy` (fees) | v17, dev and prd |
+| Confetti param-to-id / apr-caps (+8 UUIDs) | dev only; prd promotion deferred to CSRV-5823 |
+| Optimizely RPF audience + staging fee amounts | done, both environments |
+
+**There is no `new_fee_structure` feature flag.** It was in CSRV-5299's description and never
+existed. Fee content is gated on the *presence* of Confetti-supplied variables (FINDINGS #9).
+
+The baseline render in `evidence/baseline/` shows $28/$39 and no FX fee. That is **correct** - it is
+a verified pre-change render, and it should flip to $30/$41/3% once the new template version is live.
 
 ---
 

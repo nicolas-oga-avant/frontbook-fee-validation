@@ -242,7 +242,7 @@ the same as reachable: nothing can select them until `param_to_id` lands.
   implemented as written.
 - **The audience carries disabled entries** as `0019#TempRemove`, `3015#TempRemove`,
   `5015#TempRemove` - values suffixed so exact-match never fires.
-- **`main` vs `mp`:** the root `CLAUDE.md` says work from `mp`, but this launch is main-based -
+- **`main` vs `mp`:** the platform-wide `CLAUDE.md` says work from `mp`, but this launch is main-based -
   `dev.avant.com/apply` serves `basic` (main), Ocala blocks mp-based branches, and
   `lib/avant/pricing_strategies/service.rb` exists on `main` but not `mp`. Read `main` for this work.
 

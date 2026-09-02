@@ -70,6 +70,26 @@ partner code it replaces, and `reachability`.
 
 Confirm the expectations back to the user before spending a browser walk on them.
 
+### Check Confetti first
+
+Cheap, no browser, and it catches a stale-config false failure before a Run is wasted:
+
+```bash
+B=https://confetti.boston.k8s.prd.app.avant.com
+
+curl -s "$B/config?path=basic.pricing_strategy.pricing_strategy_param_to_id&env=dev" \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['config'].get('$UUID'))"
+
+curl -s "$B/config?path=basic.pricing_strategy&env=dev" \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['config']['$CODE'])"
+```
+
+`Avant::Env::Confetti.confetti_env` defaults to `prd` (`avant-basic/lib/avant/env.rb:2788`); only
+`.env.development` sets `dev`. An app on `prd` does not see the dev-only releases, and the new codes
+read as unconfigured. Confirm this before concluding a Run failed.
+
+`mla_forced` codes have no UUID and are not reachable this way. That is by design.
+
 ## Step 3 - Apply, in the browser
 
 Load `scripts/apply_harness.py` into browser-harness. Every workaround in it exists because of an
@@ -83,7 +103,14 @@ An unrecognised UUID redirects to `strategy_param_error_path`. That is a clean, 
 the UUID is not in the param map - not a bug in your walk.
 
 Use a fresh browser context per Run (`new_incognito_tab()`), so one Run's session cannot leak into
-another.
+another. Keep admin and CSP work in the default profile: an incognito context has no Okta session,
+so it cannot reach anything behind SSO.
+
+Let `AUTOFILL PERSONAL STAGE` generate the identity. It produces a fresh randomized one per Run, so
+Runs cannot collide on a duplicate customer, and the standard dev TransUnion stub approves it. **Do
+not reach for the `TST_00xx` mock catalogue** - it has no approved-card case; every `Card`-labelled
+case is a decline or a risk scenario (`docs/mock-test-cases.md`). `TST_0001` is the fallback only if
+the default stub ever stops approving.
 
 | Stage | What to do |
 | --- | --- |
@@ -106,6 +133,17 @@ Five browser traps, all silent, all handled by the harness helpers:
 
 If a stage will not advance and shows no error: blur every input, then re-read the page text. That
 surfaces the block.
+
+Confirm a submit actually happened rather than trusting the absence of an error. On `#/rates_terms`
+these three requests all return 200:
+
+```
+/api/customer_applications/<id>/save_field
+/api/customer_applications/<id>/send_product_details
+/api/customer_applications/<id>/submit_page
+```
+
+If only `google` / `doubleclick` / `facebook` requests fire, the form never submitted.
 
 **Capture the `application_id` explicitly, now.** Never look it up later by recency - see Step 4.
 
@@ -132,6 +170,10 @@ LocalCmaStub.prepare!(cca.id)    # fills the Fiserv-only fields
 # Sanity, before trusting anything downstream:
 raise "wrong strategy" unless cca.current_cardholder_pricing_strategy_identifier.to_s == "<CODE>"
 ```
+
+`LocalCmaStub` (`local-stack/zzz_local_cma_stub.rb`) refuses to run on an unissued account and
+cross-checks the pricing strategy against the decision path tag - read its header. `revert!` belongs
+in a finally-block, not on the happy path, so a crashed Run leaves no pinned account.
 
 **Never use `.last` to find the agreement log.** An account accumulates several, and picking the
 wrong one silently validates a different document. Capture the id from `issue!`.
@@ -169,20 +211,13 @@ emulated container and hangs. basic already rendered the identical PDF natively.
 ### Where the render goes, and why it is a draft
 
 `AVANT_TEMPLATES_HOST` points at **production** TemplateFlow, and the template under test is the
-latest draft at `https://templateflow.avant.com/templates/9658/edit`.
+latest draft. Nothing needs patching: a local stack already renders unapproved drafts in preview
+mode, and preview is what keeps this safe.
 
-Nothing needs patching for this. `avant-basic/lib/avant/templateflow/create_document.rb:18-19`
-defaults both `preview` and `allow_unapproved` to `!Avant::Env.acts_as_prod?`, so a local stack
-already renders unapproved drafts, in preview mode. Preview is what keeps this safe: TemplateFlow
-documents it as a "Flag to prevent saving a test doc to prod db", and `GenerateDocument` returns
-`id: nil` without persisting anything.
-
-**Assert `preview` is actually on** rather than assuming it. If anything ever makes the validation
-stack `acts_as_prod?`, both flags flip off silently: the render stops picking up the draft *and*
-starts writing documents to production.
-
-File-backed templates (`git_sha_version`, `source_file`) ship **after** the fee launch, so there is
-no sha to record. Provenance is the `template_version_uuid` returned by the render.
+**Assert `preview` is actually on** rather than assuming it - see hard rule 3 in `AGENTS.md`. The
+full argument, the code references and the consequences are in
+`docs/adr/0002-render-drafts-against-production-templateflow.md`. Provenance is the
+`template_version_uuid` the render returns; there is no `git_sha_version` yet.
 
 ## Step 5 - Assert
 
@@ -225,7 +260,15 @@ Give the user, for the code under test:
   was a draft preview - a render with no provenance cannot be attributed to a version
 - the evidence: URLs visited, the console transcript, the rendered agreement
 
-Save the rendered HTML under `evidence/`.
+Evidence is the deliverable, not a side effect - product signs off on the artifact. Capture, per
+step: the URL navigated to, the values filled, the dev helper clicked, the console command and its
+output, and the artifacts produced. Save the rendered HTML under `evidence/`.
+
+### The baseline
+
+`evidence/baseline/cma_0122_local.{html,pdf}` is the verified pre-change render for `0122`: $28/$39,
+no FX fee. That is **correct** for its Epoch. Once the new template version is live, the identical
+Run should flip to $30/$41/3%.
 
 ## Known blockers - report these, do not work around them
 

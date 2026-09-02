@@ -15,12 +15,9 @@ A self-sufficient script that runs the end-to-end manual test proving the frontb
 
 ## The unit model
 
-A **Run** is one execution against one Pricing Strategy Code: apply, approve, issue, render, assert.
-A **Pair** is a frontbook Run plus the backbook Run it replaces - the unit of evidence, because
-"backbook untouched" is only expressible across both. A **Ticket** (CSRV-5300..5303) is a reporting
-bucket with no scope of its own.
-
-28 Runs: 14 frontbook (AC 1-3) + 14 backbook (AC 4).
+Run, Pair, Ticket, Attempt, Epoch and the rest are defined in `CONTEXT.md`, which owns the
+vocabulary. What matters structurally is the count: 28 Runs, 14 frontbook (AC 1-3) paired with the
+14 backbook codes they replace (AC 4).
 
 | Ticket | Frontbook | Backbook |
 | --- | --- | --- |
@@ -71,8 +68,8 @@ any manual epoch switch (see 5).
 
 ### 4. Fresh worktrees off `main`, in every repo
 
-This is production work, not MP work. The root `CLAUDE.md` rule about basing on `mp` governs where
-code is written; this skill writes none. avant-basic#5928 targets `main`, #5927 is the `mp`
+This is production work, not MP work. The platform-wide `CLAUDE.md` rule about basing on `mp` governs
+where code is written; this skill writes none. avant-basic#5928 targets `main`, #5927 is the `mp`
 forward-port and off the critical path, and the other three repos have no `mp` branch at all.
 
 Never rely on the shared checkouts: they sit on whatever branch another session left them on.
@@ -112,13 +109,9 @@ and re-queued automatically.
 
 ### 6. Render against production TemplateFlow, in preview mode
 
-See `docs/adr/0002`, which supersedes 0001. A preview render persists nothing - TemplateFlow
-documents the flag as preventing a test doc being saved to the prod db, and `GenerateDocument`
-returns `id: nil`. `avant-basic` defaults both `preview` and `allow_unapproved` to
-`!Avant::Env.acts_as_prod?`, so a local stack renders the latest **draft** without any patch.
-
-Production is the right target rather than merely a permitted one: the draft under test lives there
-(`/templates/9658/edit`), and staging has nothing synced to validate.
+Renders target production TemplateFlow so they pick up the draft under test; `preview: true` is what
+makes that safe, and it must be asserted rather than assumed. The reasoning, the code references and
+the consequences are in `docs/adr/0002-render-drafts-against-production-templateflow.md`.
 
 Instance selection is two env vars read by
 `avant-basic/config/initializers/templateflow_engine_client.rb`: `AVANT_TEMPLATES_HOST` and
@@ -171,14 +164,12 @@ amd64-emulated on Apple Silicon, so worker count scales worse than core count su
 
 ### 10. Mechanical vs Assertion failures
 
-**Mechanical**: the apparatus broke - a click that missed, a stage that did not advance, the stack
-down, a patch that did not load. The Run halts, hands off to an agent with a resumable payload, and
-the rest of the Campaign continues.
-
-**Assertion**: a rendered or resolved value disagrees with the expected one. Recorded as `failed`.
-**No agent is invited to fix it.** Handed an assertion failure with "fix it so it can continue", the
-cheapest path to green is weakening the assertion, which an agent will do plausibly and with a good
-explanation. That yields a signed-off artifact for a fee launch that shipped wrong.
+The two failure classes are defined in `CONTEXT.md`. What the design adds is what happens to each: a
+Mechanical Failure halts its Run, hands off to an agent with a resumable payload, and lets the rest
+of the Campaign continue. An Assertion Failure is recorded as `failed` and **no agent is invited to
+fix it** - handed one with "fix it so it can continue", the cheapest path to green is weakening the
+assertion, which an agent will do plausibly and with a good explanation, yielding a signed-off
+artifact for a fee launch that shipped wrong.
 
 Hand-off payload, written to the Manifest and to stderr:
 
