@@ -594,3 +594,46 @@ exists to avoid: it looks like a clean backbook pass on a frontbook code.
 The `needs_consolidated_cma` scenario is the lever that does not depend on Optimizely. Every Run
 must assert the resolved template name, and record the Template ID and Version ID returned by the
 render, before trusting any fee assertion.
+
+## 22. `GET /api/v1/templates/<uuid>` returns the APPROVED version, not the draft
+
+Verified 2026-09-02 against production `templateflow.boston.k8s.prd.app.avant.com`.
+
+Fetching the consolidated CMA by uuid returns 96,818 bytes with **no** fee variables and `$28`/`$39`
+still hardcoded - while the v7 draft in the UI has 97,403 bytes and all of them. The endpoint is
+serving v6, the newest *approved* version.
+
+`DocumentTemplate.latest` (`avant-templates/app/models/document_template.rb:69`) branches on
+`allow_unapproved`:
+
+```ruby
+if allow_unapproved
+  order(created_at: :desc).where("uuid = ... OR template_uuid = ...").first   # newest, draft included
+else
+  latest_approved_or_exact(uuid, ...)                                          # newest APPROVED
+end
+```
+
+and `allow_unapproved` is only ever set from the **render** endpoint, where
+`app/api/documents.rb:14` requires both flags together:
+
+```ruby
+allow_unapproved = params[:preview] && params[:allow_unapproved]
+```
+
+The plain template GET takes no such parameter, so it always answers with the approved version.
+
+**The render path is unaffected and picks up the draft correctly.** basic's wrapper defaults both
+`preview` and `allow_unapproved` to `!Avant::Env.acts_as_prod?`
+(`avant-basic/lib/avant/templateflow/create_document.rb:18-19`), so a local render sends both and
+gets v7. ADR 0002 is right.
+
+Two traps follow:
+
+1. **Do not check "has the fee content shipped?" with a template GET.** It reports the approved
+   version and would have you conclude the content is missing when the draft under test carries it.
+   Read the draft in the UI, or render with `preview` + `allow_unapproved` and assert on the output.
+2. **The Epoch fallback in FINDINGS #18 is broken as written.** Hashing the `content` from
+   `GET /api/v1/templates/<uuid>` hashes the *approved* version, so the hash does not move when the
+   draft is edited - which is the only thing that changes during this campaign. Derive the Epoch
+   from the `template_version_uuid` the render returns instead; that is the version actually used.

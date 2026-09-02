@@ -114,7 +114,8 @@ step "Local patches"
 if [ "$VERIFY_ONLY" = "--verify" ]; then
   for f in docker-compose.override.yml \
            config/initializers/zzz_local_transunion_mock.rb \
-           config/initializers/zzz_local_cma_stub.rb; do
+           config/initializers/zzz_local_cma_stub.rb \
+           config/initializers/zzz_local_consolidated_cma.rb; do
     [ -f "$VALIDATION_ROOT/avant-basic/$f" ] || die "missing patch: avant-basic/$f"
   done
   ok "patches present"
