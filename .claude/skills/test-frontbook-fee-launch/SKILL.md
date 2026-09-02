@@ -1,6 +1,6 @@
 ---
 name: test-frontbook-fee-launch
-description: Runs one end-to-end frontbook fee launch validation locally for a given pricing strategy code - sets up the stack from nothing, drives a card application to approval in the browser, issues the card, renders the cardmember agreement, and asserts the fee content. Use when asked to "validate strategy 0122", "test the frontbook fee launch", "run the fee validation for CSRV-5300/5301/5302/5303", or to check that a backbook code still renders $28/$39 with no foreign transaction fee. This is the LLM-driven version: it drives the browser through browser-harness. Not for production - it renders against staging TemplateFlow only.
+description: Runs one end-to-end frontbook fee launch validation locally for a given pricing strategy code - sets up the stack from nothing, drives a card application to approval in the browser, issues the card, renders the cardmember agreement, and asserts the fee content. Use when asked to "validate strategy 0122", "test the frontbook fee launch", "run the fee validation for CSRV-5300/5301/5302/5303", or to check that a backbook code still renders $28/$39 with no foreign transaction fee. This is the LLM-driven version: it drives the browser through browser-harness. Renders go against production TemplateFlow in preview mode, picking up the latest draft of the template.
 ---
 
 # Frontbook fee launch validation - one Run
@@ -35,16 +35,9 @@ add worktrees for `avant-basic`, `credit-card-api` and `crm` under `$VALIDATION_
 (default `~/Source/avant/frontbook-validation`), restore the local patches, start all three stacks,
 and verify the things that fail silently.
 
-It needs one credential: `AVANT_TEMPLATES_API_KEY`, in `.env.local` at the repo root. It tries to
-read it from the TemplateFlow pod itself:
-
-```bash
-kubectl -n templateflow-asm exec deploy/templateflow-01 -- printenv STAGING_API_KEY
-```
-
-If the user has no cluster access, **ask them for it** - a teammate can send their `.env.local`.
-Take `STAGING_API_KEY`, never `API_KEY`: the latter is the prod legacy key and using it creates the
-prod legacy admin user inside the staging database.
+It needs one credential: `AVANT_TEMPLATES_API_KEY`, in `.env.local` at the repo root. This is the
+**production** TemplateFlow key. If the user does not have one, **ask them** - a teammate can send
+their `.env.local`. Do not go looking for it in Vault; it is not there.
 
 Do not proceed on a failed bootstrap. Every one of its checks exists because something downstream
 fails silently without it.
@@ -173,6 +166,24 @@ File.write('/usr/src/app/tmp/cma.html', log.document_html.to_s)
 Do **not** use the CSP "Download CMA" button or the `.eml`. That route pipes `wkhtmltopdf` inside an
 emulated container and hangs. basic already rendered the identical PDF natively.
 
+### Where the render goes, and why it is a draft
+
+`AVANT_TEMPLATES_HOST` points at **production** TemplateFlow, and the template under test is the
+latest draft at `https://templateflow.avant.com/templates/9658/edit`.
+
+Nothing needs patching for this. `avant-basic/lib/avant/templateflow/create_document.rb:18-19`
+defaults both `preview` and `allow_unapproved` to `!Avant::Env.acts_as_prod?`, so a local stack
+already renders unapproved drafts, in preview mode. Preview is what keeps this safe: TemplateFlow
+documents it as a "Flag to prevent saving a test doc to prod db", and `GenerateDocument` returns
+`id: nil` without persisting anything.
+
+**Assert `preview` is actually on** rather than assuming it. If anything ever makes the validation
+stack `acts_as_prod?`, both flags flip off silently: the render stops picking up the draft *and*
+starts writing documents to production.
+
+File-backed templates (`git_sha_version`, `source_file`) ship **after** the fee launch, so there is
+no sha to record. Provenance is the `template_version_uuid` returned by the render.
+
 ## Step 5 - Assert
 
 Two layers. Run both.
@@ -210,20 +221,17 @@ Give the user, for the code under test:
 - expected vs actual for every assertion, and a verdict
 - the pricing strategy actually resolved, read from
   `cca.current_cardholder_pricing_strategy_identifier` - the CSP never displays it
-- the TemplateFlow host and the template's `git_sha_version` (or, while it is null, a SHA256 of the
-  template content) - a render with no provenance cannot be attributed to a version
+- the TemplateFlow host, the `template_version_uuid` from the render response, and the fact that it
+  was a draft preview - a render with no provenance cannot be attributed to a version
 - the evidence: URLs visited, the console transcript, the rendered agreement
 
 Save the rendered HTML under `evidence/`.
 
 ## Known blockers - report these, do not work around them
 
-- **Frontbook codes cannot pass the content assertions yet.** Staging TemplateFlow is not git-backed
-  (`git_sha_version` and `source_file` are both null, last updated 2026-05-20) and its stored content
-  contains none of `cma_late_fee_initial`, `cma_late_fee_subsequent`, `cma_foreign_transaction_fee`.
-  The blocker is **CSRV-5219** (staging sync), not avant-templates#74 merging. **The 14 backbook
-  codes are fully testable today** and are the useful work until that lands.
 - **MLA codes are not runnable** until the local TransUnion MLA patch is written.
+- **You are validating a draft.** Say so in the report. A draft render proves the pending content is
+  correct; it is not evidence that customers receive it today.
 - **No product decision** exists on a locally-approved application, so `cma_apr_margin_decimal` is
   nil. Fees are unaffected, but do not trust the APR margin on a variable-rate strategy. Do not
   fabricate a decision to silence it.

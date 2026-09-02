@@ -36,9 +36,9 @@ Deterministic, no browser. Wrap this first.
 - [ ] Template Version read from the render and stamped on every Attempt
 - [ ] TemplateFlow instance host stamped on every Attempt
 - [ ] Repo commit SHAs stamped on every Attempt
-- [ ] Epoch derived from Template Version alone, never from a fee amount
+- [ ] Epoch derived from `template_version_uuid` (no `git_sha_version` exists pre-launch), never from a fee amount
 - [ ] Attempts under a superseded Template Version auto-marked stale and re-queued
-- [ ] Prod fidelity check: `GET get_template_details` against prod, compare `git_sha_version`. **Read only**
+- [ ] Assert `preview` is on for every render. If the stack ever becomes `acts_as_prod?`, drafts stop rendering and documents start persisting to production
 
 ## Phase 3 - browser phase
 
@@ -102,11 +102,12 @@ Deterministic, no browser. Wrap this first.
 
 - [ ] File the one-line `raw_test_data` defect in `avant-basic` (FINDINGS #3). It blocks the six
       backbook MLA Runs too, so it is not resolved by any other dependency
-- [x] ~~Verify Ocala has avant-templates#74's sha synced~~ **Answered 2026-09-01: it does not, and
-      cannot yet.** Ocala's CMA template is not git-backed at all (FINDINGS #18). CSRV-5219 (staging
-      sync) has not run. **AC 2 is blocked on Ocala until it does** - this is now the single
-      critical-path dependency for the frontbook half of the Campaign
-- [ ] Chase CSRV-5219. Until it lands, only the 14 backbook Runs can produce final evidence
+- [x] ~~Verify Ocala has avant-templates#74's sha synced~~ **Moot.** File-backed templates ship
+      *after* the fee launch, so there is nothing to sync and no `git_sha_version` anywhere. Phase 1
+      renders the latest draft from production TemplateFlow instead - see `ROADMAP.md` and
+      `docs/adr/0002`
+- [ ] Confirm the draft at `templateflow.avant.com/templates/9658/edit` carries the new fee content,
+      and map template 9658 to the uuid basic resolves for `credit_card_cardmember_agreement_1`
 - [ ] `roll_pricing_strategy_configuration` still rolls 100% to `0120`, so no application is ever
       *organically* assigned a frontbook code. Does not block URL-driven testing. Flagged on CSRV-5297
 - [ ] CSRV-5823 tracks the deferred prd Confetti promotion

@@ -11,7 +11,7 @@ way to force it. See FINDINGS #3 and the root `CLAUDE.md`.
 | Docker with ~8GB available to the VM | three Rails/Node stacks, amd64-emulated on Apple Silicon |
 | Checkouts of `avant-basic`, `credit-card-api`, `crm` | siblings in one directory; see `AVANT_ROOT` below |
 | Chrome | the harness drives its own instance on a debug port, not yours |
-| `kubectl` against `glbdev-use2-eks-ocala` | once, to read the TemplateFlow staging API key |
+| A production TemplateFlow API key | ask a teammate; it is not in Vault |
 | Python 3.11+ | the harness and the assertion scripts |
 
 Repo layout is not assumed. `local-stack/restore.sh` defaults to the parent-of-parent-of-parent of
@@ -63,7 +63,7 @@ CRM   --API_URL_US-->              http://host.docker.internal:5001
 basic --CREDIT_CARD_API_ENDPOINT--> http://host.docker.internal:7100
 CCAPI --AVANT_BASIC_HOST_URL-->    http://host.docker.internal:5001
 CCAPI --FDR_GATEWAY_URL-->         https://fdr-gateway-asm.ocala.k8s.dev.global.avant.com
-basic --AVANT_TEMPLATES_HOST-->    templateflow.ocala.k8s.dev.global.avant.com   (never production - ADR 0001)
+basic --AVANT_TEMPLATES_HOST-->    templateflow.avant.com   (production, preview mode - ADR 0002)
 ```
 
 `AVANT_TEMPLATES_HOST` and `AVANT_TEMPLATES_API_KEY` are read by
@@ -74,19 +74,14 @@ Put both in `.env.local`, which is gitignored and sourced automatically by
 
 ```bash
 cp .env.local.example .env.local && chmod 600 .env.local
-kubectl -n templateflow-asm exec deploy/templateflow-01 -- printenv STAGING_API_KEY
-# paste into AVANT_TEMPLATES_API_KEY=
 ```
 
-The key is not in Vault and does not need to be. `avant-templates/app/api/root.rb:17-18` accepts two
-bare keys straight from the TemplateFlow pod's own environment - `ENV['API_KEY']` for the prod legacy
-user and `ENV['STAGING_API_KEY']` for the staging one - and `lazily_create_legacy_api_user!` creates
-the admin user and its `ApiKey` on first use. **Take `STAGING_API_KEY`.** Using `API_KEY` would create
-the *prod* legacy admin user inside the staging database.
+`AVANT_TEMPLATES_HOST` is **`templateflow.avant.com`** - production. `AVANT_TEMPLATES_API_KEY` is a
+production credential; it is not in Vault, so ask a teammate for theirs. Keep it in `.env.local` and
+the process environment only, never in `local-stack/*.yml`, which exist to be copied around.
 
-The credential is never written into `local-stack/*.yml`. The override names
-`AVANT_TEMPLATES_API_KEY` with no value, so Compose passes it through from the shell that ran `up`.
-Env vars are baked at container creation, so after changing it:
+The override names `AVANT_TEMPLATES_API_KEY` with no value, so Compose passes it through from the
+shell that ran `up`. Env vars are baked at container creation, so after changing it:
 
 ```bash
 docker compose -p basic-csrv-5300 up -d --force-recreate web sidekiq   # basic only, never CRM
@@ -95,21 +90,21 @@ docker compose -p basic-csrv-5300 exec web sh -c 'printenv AVANT_TEMPLATES_HOST;
 
 A character count of 1 means the value never reached the container, and every render will 401.
 
-### Which TemplateFlow
+### Why production, and why this is safe
 
-There is no "dev" TemplateFlow. `avant-templates/.avant/terraform/.global-dev.tfvars:1` sets
-`environment_override = "stg"`, so the global-dev account's instance **is** the staging deployment;
-the `avant-stg-shared-app-*` names are that same stack's legacy AWS resources (Aurora, Redis), not a
-second environment. The EKS deployment is `templateflow-01` in namespace `templateflow-asm`
-(`locals.tf:3`) on cluster `glbdev-use2-eks-ocala`, reachable at
-`templateflow.ocala.k8s.dev.global.avant.com`.
+Renders go out with `preview: true` and `allow_unapproved: true`, both defaulted from
+`!Avant::Env.acts_as_prod?` in `avant-basic/lib/avant/templateflow/create_document.rb:18-19`. So a
+local stack picks up the latest **draft** of the template - the artifact actually under test, at
+`https://templateflow.avant.com/templates/9658/edit` - and preview keeps it from persisting
+anything: TemplateFlow describes the flag as preventing a test doc being saved to the prod db, and
+`GenerateDocument` returns `id: nil`. See `docs/adr/0002`.
 
-Host verified: `GET /api/v1/templates` returns 401 without a key, which is what
-`TemplateflowEngine::Client::Send` maps to "your token is invalid". A 401 *after* setting the key
-means the key is wrong, not the host.
+Staging is not a usable target: file-backed templates ship after the fee launch, so there is nothing
+synced there to validate (FINDINGS #18).
 
-("templateflow-01" appears in CSRV-5299's testing plan as though it were a hostname. It is a
-deployment name.)
+**Assert preview is on rather than assuming it.** Anything that makes this stack `acts_as_prod?`
+flips both flags off silently - the render stops picking up the draft and starts writing to
+production.
 
 ## Environment traps that cost hours
 

@@ -28,8 +28,7 @@ for c in git docker python3; do
 done
 docker info >/dev/null 2>&1 || die "Docker is not running. Start Docker/OrbStack and re-run."
 ok "docker daemon"
-command -v kubectl >/dev/null && ok "kubectl (optional, for reading the TemplateFlow key)" \
-  || info "kubectl not found - you will need the API key handed to you instead"
+info "TemplateFlow key comes from .env.local - see below"
 
 # Compose project names are fixed, so a stack already running from a DIFFERENT directory
 # will be recreated against $VALIDATION_ROOT - taking its database and any issued accounts
@@ -90,9 +89,9 @@ fi
 set -a; . "$ENVFILE"; set +a
 
 if [ -z "${AVANT_TEMPLATES_API_KEY:-}" ]; then
-  if [ "$VERIFY_ONLY" != "--verify" ] && command -v kubectl >/dev/null; then
-    info "trying to read STAGING_API_KEY from the TemplateFlow pod"
-    key="$(kubectl -n templateflow-asm exec deploy/templateflow-01 -- printenv STAGING_API_KEY 2>/dev/null || true)"
+  if [ "$VERIFY_ONLY" != "--verify" ] && [ -n "${TEMPLATEFLOW_KEY_FROM:-}" ]; then
+    info "reading the key from \$TEMPLATEFLOW_KEY_FROM"
+    key="$(cat "$TEMPLATEFLOW_KEY_FROM" 2>/dev/null || true)"
     if [ -n "$key" ]; then
       # macOS and GNU sed disagree on -i; write via a temp file instead.
       awk -v k="$key" '/^AVANT_TEMPLATES_API_KEY=/{print "AVANT_TEMPLATES_API_KEY=" k; next} {print}' \
@@ -103,11 +102,10 @@ if [ -z "${AVANT_TEMPLATES_API_KEY:-}" ]; then
   fi
 fi
 [ -n "${AVANT_TEMPLATES_API_KEY:-}" ] || die "AVANT_TEMPLATES_API_KEY is empty in $ENVFILE.
-  Every CMA render will fail with 401, long after the stack looks healthy.
-  Get it one of these ways:
-    kubectl -n templateflow-asm exec deploy/templateflow-01 -- printenv STAGING_API_KEY
-    or ask a teammate to send you their .env.local
-  Take STAGING_API_KEY, never API_KEY (that is the prod legacy key)."
+  Every render will fail with 401, long after the stack looks healthy.
+  This is the PRODUCTION TemplateFlow key - ask a teammate to send you their .env.local.
+  Renders go out in preview mode and persist nothing (docs/adr/0002), but the credential
+  is real: keep it out of commits."
 ok "AVANT_TEMPLATES_API_KEY set (${#AVANT_TEMPLATES_API_KEY} chars)"
 ok "AVANT_TEMPLATES_HOST=${AVANT_TEMPLATES_HOST:-unset}"
 

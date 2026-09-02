@@ -1,3 +1,8 @@
+> **SUPERSEDED by [ADR 0002](0002-render-drafts-against-production-templateflow.md).**
+> The premise below - that rendering is necessarily a write - is wrong for the preview path, which
+> is what a local stack uses by default. Kept because the reasoning about `POST /documents` still
+> applies to any non-preview render.
+
 # Validation never renders against production TemplateFlow
 
 Rendering a cardmember agreement is `POST /documents` (`templateflow-engine`,

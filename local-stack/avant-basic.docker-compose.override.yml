@@ -21,14 +21,13 @@ services:
       # file, so Avant::Env.enable_mock_services? is false and BOTH mock
       # initializers silently skip. Set it explicitly.
       ENABLE_MOCK_SERVICES: "1"
-      # Renders the CMA against the ocala (staging) TemplateFlow. NEVER production:
-      # rendering is POST /documents, a write. See docs/adr/0001.
-      AVANT_TEMPLATES_HOST: templateflow.ocala.k8s.dev.global.avant.com
+      # Production TemplateFlow. Safe because a local stack is not acts_as_prod?, so
+      # create_document defaults preview AND allow_unapproved to true: it renders the
+      # latest DRAFT and persists nothing. See docs/adr/0002.
+      AVANT_TEMPLATES_HOST: templateflow.avant.com
       # Deliberately valueless: Compose passes it through from the shell that ran `up`,
       # so the credential never lands in this file, which exists to be copied around.
-      # Export it first:
-      #   export AVANT_TEMPLATES_API_KEY="$(kubectl -n templateflow-asm \
-      #     exec deploy/templateflow-01 -- printenv STAGING_API_KEY)"
+      # It is a production credential - keep it in .env.local, never here.
       AVANT_TEMPLATES_API_KEY:
 
   sidekiq:

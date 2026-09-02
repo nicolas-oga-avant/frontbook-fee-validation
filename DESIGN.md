@@ -97,11 +97,11 @@ Since CSRV-4904 the CMA templates are git-backed (`app/templates/cma/agreement_b
 file, five variants as internal Liquid conditionals), each carrying a `git_sha_version`. So the
 Epoch is exactly that sha, read from the render.
 
-**Except on Ocala today, where it is null.** CSRV-4904 landed in the repo but the staging sync
-(CSRV-5219) has not run, so Ocala's CMA records carry neither `git_sha_version` nor `source_file` -
-see FINDINGS #18. Until that sync lands, the Epoch signal is a SHA256 of the template `content`
-returned by `GET /api/v1/templates/<uuid>`, which needs no git-backing. Record both fields; prefer
-`git_sha_version` whenever it is present. It is detected, never configured: a human-set epoch
+**Except that file-backed templates ship after this launch, not before.** CSRV-4904 landed in the
+repo, but the sync that would give a live template a `git_sha_version` is post-launch work, so
+today every instance returns null for it - see FINDINGS #18. Until then the Epoch signal is the
+`template_version_uuid` returned by the render, which exists regardless of git-backing. Record
+`git_sha_version` too, and prefer it once it is populated. It is detected, never configured: a human-set epoch
 flag is wrong precisely in the week the change lands.
 
 **Epoch detection must never read a fee amount.** "Does the CMA say $30" is the assertion itself;
@@ -110,11 +110,15 @@ using it to choose the expectation makes every Run tautologically pass.
 When the Epoch advances, passing Attempts recorded under the old Template Version are marked stale
 and re-queued automatically.
 
-### 6. Render on Ocala, verify prod by reading
+### 6. Render against production TemplateFlow, in preview mode
 
-See `docs/adr/0001`. Rendering is `POST /documents` - a write. Fidelity to production comes from
-`GET get_template_details` against prod and comparing `git_sha_version`, plus the existing
-`cma:reconcile` rake task for engine-level drift.
+See `docs/adr/0002`, which supersedes 0001. A preview render persists nothing - TemplateFlow
+documents the flag as preventing a test doc being saved to the prod db, and `GenerateDocument`
+returns `id: nil`. `avant-basic` defaults both `preview` and `allow_unapproved` to
+`!Avant::Env.acts_as_prod?`, so a local stack renders the latest **draft** without any patch.
+
+Production is the right target rather than merely a permitted one: the draft under test lives there
+(`/templates/9658/edit`), and staging has nothing synced to validate.
 
 Instance selection is two env vars read by
 `avant-basic/config/initializers/templateflow_engine_client.rb`: `AVANT_TEMPLATES_HOST` and
