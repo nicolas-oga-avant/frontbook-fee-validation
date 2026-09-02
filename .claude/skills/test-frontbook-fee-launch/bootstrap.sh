@@ -120,6 +120,7 @@ if [ "$VERIFY_ONLY" = "--verify" ]; then
   for f in docker-compose.override.yml \
            config/initializers/zzz_local_transunion_mock.rb \
            config/initializers/zzz_local_cma_stub.rb \
+           config/initializers/zzz_local_mla_stub.rb \
            config/initializers/zzz_local_consolidated_cma.rb \
            config/initializers/zzz_local_render_provenance.rb \
            config/initializers/zzz_local_cma_render.rb; do
@@ -191,7 +192,8 @@ ok "TemplateFlow key reached the container"
 # in flight. It passes on a small log and fails on a big one.
 bootlog="$(cd "$VALIDATION_ROOT/avant-basic" && docker compose -p basic-frontbook-fee-validation exec -T web \
   sh -c 'grep -h "\[local\]" log/development.log 2>/dev/null' 2>/dev/null || true)"
-for want in 'LocalConsolidatedCma active' 'LocalRenderProvenance active' 'FakeTransunion mock registered'; do
+for want in 'LocalConsolidatedCma active' 'LocalRenderProvenance active' 'LocalMlaStub active' \
+            'FakeTransunion mock registered'; do
   case "$bootlog" in
     *"$want"*) ok "boot log: $want" ;;
     *) die "no '[local] $want' in log/development.log.

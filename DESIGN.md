@@ -132,16 +132,18 @@ carried over from an earlier render cannot pass as a fresh one. One render per a
 
 ### 7. All 28 Runs are RENDERED - MLA is forced locally
 
-The 12 MLA Runs were thought unreachable. They are not: the block is one hardcoded line in
-`avant-basic/lib/avant/trans_union/gateway.rb`, where `raw_test_data`'s `transunion_mla` branch
-returns `:mla_negative_stub` unconditionally while the `transunion` branch directly above it honours
-a last-name override. The positive fixture exists and is verified valid (the `07051`/`01`/`M01`
-addon triple). See FINDINGS #3.
+The 12 MLA Runs were thought unreachable. They are not - and the reason is the opposite of the one
+first recorded. The card policy pulls the MLA report through the report manager, so
+`raw_test_data`'s hardcoded `:mla_negative_stub` never runs on this flow; the mock that does serve
+it, `FakeTransunion#get_mla_report`, defaults **every** applicant to the positive fixture. So MLA
+was never blocked - it was unconditionally on, silently repricing any base-code Run whose code has
+an M variant (12 of the 16). See FINDINGS #33.
 
-A local `zzz_local_mla_stub.rb` patches that one branch. Constraints:
+A local `zzz_local_mla_stub.rb` makes it a per-Run choice in both directions, dispatching on the
+applicant's last name the way the sibling reports in the same mock already do. Constraints:
 
-1. **One method, one line.** Any patch touching `mla_customer?`, pricing-strategy resolution, or the
-   render path invalidates the evidence.
+1. **One method per path, dispatching on the last name and nothing else.** Any patch touching
+   `mla_customer?`, pricing-strategy resolution, or the render path invalidates the evidence.
 2. **Assert the forcing worked** - `military_lending_act_confirmed` true AND the resolved strategy is
    the MLA code. The stub can load and still resolve negative.
 3. **Stamp the Attempt** `mla_forced: true` so the artifact shows it.

@@ -59,6 +59,7 @@ echo "Restoring local-stack overrides into $ROOT"
 restore avant-basic.docker-compose.override.yml  avant-basic     docker-compose.override.yml
 restore zzz_local_transunion_mock.rb             avant-basic     config/initializers/zzz_local_transunion_mock.rb
 restore zzz_local_cma_stub.rb                    avant-basic     config/initializers/zzz_local_cma_stub.rb
+restore zzz_local_mla_stub.rb                    avant-basic     config/initializers/zzz_local_mla_stub.rb
 restore zzz_local_consolidated_cma.rb            avant-basic     config/initializers/zzz_local_consolidated_cma.rb
 restore zzz_local_render_provenance.rb           avant-basic     config/initializers/zzz_local_render_provenance.rb
 restore zzz_local_cma_render.rb                  avant-basic     config/initializers/zzz_local_cma_render.rb

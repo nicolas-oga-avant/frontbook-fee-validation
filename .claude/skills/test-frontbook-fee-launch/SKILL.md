@@ -64,9 +64,10 @@ partner code it replaces, and `reachability`.
 
 - **`direct`** - the code has a UUID and is selectable by URL. 16 of 28.
 - **`mla_forced`** - an MLA variant. It has no UUID by design; it is reached by applying under its
-  non-MLA twin with a local patch forcing a positive TransUnion MLA report. **That patch is not
-  written yet.** If the user asks for an `mla_forced` code, say so and stop rather than running the
-  twin and reporting it as the MLA code.
+  base code (`mla_base_code`) as an applicant the local MLA stub reports as a covered borrower.
+  12 of 28. `apply_plan(code)` in the harness returns the URL and the last name to use together -
+  use it rather than assembling the two by hand, because a base URL walked with the plain
+  `approved` last name produces a Run for the **base** code that looks like an MLA Run.
 
 Confirm the expectations back to the user before spending a browser walk on them.
 
@@ -88,7 +89,10 @@ curl -s "$B/config?path=basic.pricing_strategy&env=dev" \
 `.env.development` sets `dev`. An app on `prd` does not see the dev-only releases, and the new codes
 read as unconfigured. Confirm this before concluding a Run failed.
 
-`mla_forced` codes have no UUID and are not reachable this way. That is by design.
+`mla_forced` codes have no UUID and are not reachable this way. That is by design - check the
+`mla_base_code` row instead. The M code carries no `basic.pricing_strategy` entry of its own
+either: `cma_pricing_strategy_config` falls back to `code_to_mla.key(identifier)`, so an MLA
+account is priced off the base code's entry.
 
 ## Step 3 - Apply, in the browser
 
@@ -98,6 +102,9 @@ observed failure; read its module docstring first.
 ```
 http://localhost:5001/apply?product_type=credit_card&strategy=<UUID>
 ```
+
+`apply_plan(code)` returns that URL together with the TU last name the code needs, which is the only
+safe way to reach an MLA code - the two halves must agree.
 
 An unrecognised UUID redirects to `strategy_param_error_path`. That is a clean, fast failure meaning
 the UUID is not in the param map - not a bug in your walk.
@@ -114,7 +121,7 @@ the default stub ever stops approving.
 
 | Stage | What to do |
 | --- | --- |
-| `#/personal` | `autofill_stage()`; **then** `set_tu_scenario("approved")` - autofill overwrites the last name, and the TU mock keys off it; `fix_autofill_phone()`; `tick_consents_dom()` |
+| `#/personal` | `autofill_stage()`; **then** `set_tu_scenario(plan["tu_last_name"])` - autofill overwrites the last name, and both TU mocks key off it; `fix_autofill_phone()`; `tick_consents_dom()` |
 | `#/personal_continued` | `autofill_stage()`; **`fix_autofill_address()`** - overwrite the whole address; `tick_consents_dom()` (an extra IL-specific consent appears) |
 | `#/rates_terms` | `autofill_stage()`; `tick_consents_dom()` - `creditHardPullConsent` is the one that blocks approval |
 | `#/password` | `set_input("customer.password", ...)` and `customer.passwordConfirmation` |
@@ -172,6 +179,10 @@ unrelated-looking.
 ```ruby
 OptimizelyInitializer.setup!
 
+# On an MLA Run, first prove the forcing took. It is silent when it does not: the account simply
+# opens under the base code and the Run reports frontbook amounts for a code nobody asked about.
+LocalMlaStub.verify!(<application_id>, expected_code: "<CODE>")
+
 cca = CreditCardAccount.find(<cca_id>)
 cca.issue!                       # => true. Real onboarding, servicing account, agreement log
 LocalCmaStub.prepare!(cca.id)    # Fiserv-only fields, and forces the consolidated CMA
@@ -181,7 +192,9 @@ raise "wrong strategy" unless cca.current_cardholder_pricing_strategy_identifier
 ```
 
 `LocalCmaStub` (`local-stack/zzz_local_cma_stub.rb`) refuses to run on an unissued account and
-cross-checks the pricing strategy against the decision path tag - read its header. `revert!` belongs
+cross-checks the pricing strategy against the decision path tag - read its header. On an MLA Run the
+tag holds the **base** code and the account holds the M code; the cross-check maps through
+`code_to_mla` rather than comparing them raw. `revert!` belongs
 in a finally-block, not on the happy path, so a crashed Run leaves no pinned account.
 
 `prepare!` also tags the account `needs_consolidated_cma`, and `verify!` raises unless the resolved
@@ -331,7 +344,9 @@ Run should flip to $30/$41/3%.
 
 ## Known blockers - report these, do not work around them
 
-- **MLA codes are not runnable** until the local TransUnion MLA patch is written.
+- **An MLA Run's classification is forged**, and the report says so. `LocalMlaStub` supplies a
+  positive TransUnion MLA report; everything downstream of it - the `code_to_mla` mapping, the
+  render variables, the template - runs unpatched. Stamp `mla_forced: true` on the Attempt.
 - **You are validating a draft.** Say so in the report. A draft render proves the pending content is
   correct; it is not evidence that customers receive it today.
 - **No product decision** exists on a locally-approved application, so `cma_apr_margin_decimal` is

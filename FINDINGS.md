@@ -56,10 +56,14 @@ are near-empty - `group_9xxx.rb` is entirely commented out - and are **not** the
 
 ## 3. MLA variants cannot be tested in dev (12 of the 28 runs)
 
-> **UPDATE 2026-09-01: superseded in part.** The diagnosis below is correct, but the conclusion
-> "cannot be tested" is not. The minimal fix at the bottom of this finding is applied locally as
-> `zzz_local_mla_stub.rb`, so all 28 Runs are reachable. See `DESIGN.md` decision 7 for the
-> constraints on that patch. The underlying defect in `avant-basic` is still unowned - see `ROADMAP.md`.
+> **UPDATE 2026-09-01: superseded in part.** The conclusion "cannot be tested" is wrong; all 28
+> Runs are reachable. See `DESIGN.md` decision 7 for the constraints on the patch that does it.
+>
+> **UPDATE 2026-09-02: the diagnosis below is wrong too, for this flow.** The card policy pulls the
+> MLA report through the report manager, so `raw_test_data` is never reached and its hardcoded
+> `:mla_negative_stub` blocks nothing. The mock that actually serves it defaults every applicant to
+> the *positive* fixture. Read **FINDINGS #33** before acting on anything below. The one-line
+> `avant-basic` defect described here is real and still unowned, but it is not the blocker.
 
 
 The 12 MLA codes have no UUID and are never URL-selectable. They are derived at onboarding:
@@ -906,3 +910,45 @@ app.product.approve!
 The lesson is about the docs, not the platform: a corrected finding is not a corrected runbook.
 When a finding invalidates a step, edit the step in the same pass.
 
+
+## 33. Every local applicant is an MLA customer by default, and the fix is not where #3 said
+
+**Symptom.** An application walked under base code `3303` issues under `3M33`, and nothing says so.
+Conversely `zzz_local_mla_stub.rb`'s first version patched `TransUnion::Gateway.raw_test_data` per
+FINDINGS #3 and made no difference either way: MLA was already positive before it, and still
+positive with it.
+
+**Cause.** The card policy answers true to `pull_using_report_manager?(:transunion_mla)`
+(`app/models/customer_application/reports.rb:231`), so the MLA pull goes through the report manager
+and is served by the WebMock stub, never by `raw_test_data`. The hardcoded `:mla_negative_stub` that
+FINDINGS #3 blamed is unreachable on this flow. What the stub does instead is the opposite:
+
+```ruby
+# spec/support/rails/mock_services/report_manager/transunion.rb:219
+file = MAP_FOR_TRANSUNION_MLA_REPORT.fetch(handler.identifier, :transunion_mla_positive)
+```
+
+The map has four SSN entries, one of which is a negative. Every other applicant - every randomly
+autofilled one - falls through to the **positive** fixture. Unlike the primary and secondary
+reports in the same class, the MLA report consults no last name.
+
+**Verified 2026-09-02** on application 7, last name `approved`, walked for `0120`: the MLA pull
+returned `military_lending_act_confirmed = true`.
+
+**Why it matters more than the reverse.** `0122`/`0120`/`0123`/`0121` have no MLA variant, so their
+Runs are unaffected and the existing evidence stands. The other 12 URL-reachable codes all do, so
+each would silently issue under its M code while the Run believed it was testing the base one - a
+plausible wrong answer, not an error.
+
+**Fix.** `zzz_local_mla_stub.rb` prepends `get_mla_report`, dispatching on the applicant's last name
+the way the sibling reports already do: a last name containing `mla` gets the positive fixture,
+everyone else the negative one. It patches `raw_test_data` the same way so a policy that skips the
+report manager cannot diverge silently, but that half is belt and braces - the report-manager path
+is the one that fires. `LocalMlaStub.verify!` asserts both halves of the outcome.
+
+Use the last name **`mlaapproved`**, not `mla`: `FakeTransunion` matches the primary report's
+`approved` with `include?`, so one name drives both mocks. A plain `mla` applicant is an MLA
+customer whose application declines.
+
+The one-line `avant-basic` defect in FINDINGS #3 is still real and still unowned, but it is not what
+blocks MLA testing, and fixing it would not have unblocked anything.

@@ -93,10 +93,39 @@ def apply_url(code, matrix=None):
         if row and row.get("mla_base_code"):
             raise ValueError(
                 "%s is an MLA variant with no strategy uuid: apply under base code %s as an "
-                "MLA-flagged applicant instead" % (code, row["mla_base_code"])
+                "MLA-flagged applicant instead - use apply_plan(%r)"
+                % (code, row["mla_base_code"], code)
             )
         raise ValueError("no strategy uuid for code %r in run-matrix.csv" % code)
     return "%s/apply?product_type=credit_card&strategy=%s" % (APPLY_BASE, uuids[code])
+
+
+def apply_plan(code, matrix=None):
+    """How to reach one code: which URL to apply at, and which TU last name to use.
+
+    An MLA code has no uuid of its own. It is reached by applying under its base code with an
+    applicant the TransUnion MLA stub reports as a covered borrower, and onboarding then maps
+    base -> M code (see local-stack/zzz_local_mla_stub.rb). Returns the plan rather than letting
+    a caller assemble it, because the two halves must agree: applying at the base URL with the
+    plain "approved" last name silently produces a Run for the BASE code that looks like an
+    MLA Run.
+
+    Returns {"code", "apply_code", "url", "tu_last_name", "mla_forced"}.
+    """
+    rows = {r["code"]: r for r in (load_run_matrix() if matrix is None else matrix)}
+    row = rows.get(code)
+    if row is None:
+        raise ValueError("no row for code %r in run-matrix.csv" % code)
+
+    base = row.get("mla_base_code") or ""
+    apply_code = base or code
+    return {
+        "code": code,
+        "apply_code": apply_code,
+        "url": apply_url(apply_code, matrix),
+        "tu_last_name": MLA_LAST_NAME if base else "approved",
+        "mla_forced": bool(base),
+    }
 
 
 # --- browser context -------------------------------------------------------------------
@@ -220,8 +249,14 @@ CONSISTENT_STATE = "IL"
 
 # FakeTransunion (see FINDINGS #14) keys its report off the applicant's LAST NAME.
 # Only meaningful against a LOCAL basic with the TU mock registered.
+# "mlaapproved" satisfies two mocks at once: FakeTransunion matches "approved" with include?,
+# so the primary report still approves, and LocalMlaStub matches "mla" on the MLA pull. Using
+# plain "mla" declines nothing loudly - it just fails to approve.
+MLA_LAST_NAME = "mlaapproved"
+
 TU_LAST_NAMES = {
     "approved": "approved report",
+    MLA_LAST_NAME: "approved report, and a positive MLA report (forces the MLA pricing code)",
     "declined": "declined report",
     "freeze": "security freeze",
     "initialfcra": "initial FCRA alert",

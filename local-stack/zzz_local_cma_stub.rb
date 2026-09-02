@@ -200,18 +200,33 @@ module LocalCmaStub
                    'CMA under the wrong strategy.'
     end
 
-    # The strategy the application was actually decisioned under.
+    # The strategy the application was actually decisioned under, after the MLA mapping.
+    #
+    # The decision path tag holds the BASE code: onboarding maps it to the M code afterwards
+    # (lib/avant/decisioning/channels/onboarding.rb:123), so on an MLA Run the account is priced
+    # at 3M33 while the tag still says 3303. Comparing the two raw would fail every MLA Run.
+    # Reads the same Confetti mapping onboarding reads rather than a local copy.
     def decisioned_pricing_strategy(cca)
       app = cca.customer_application
       return nil unless app
 
-      DecisionPathTag
+      base = DecisionPathTag
         .where(customer_application_id: app.id, path_key: STRATEGY_TAG_KEY)
         .order(created_at: :desc)
         .first
         &.data
         &.dig('pricing_strategy_id')
         .presence
+      return base if base.blank?
+      return base unless mla_customer?(app)
+
+      PricingStrategies::Service.pricing_strategy_code_to_mla.fetch(base, base)
+    end
+
+    def mla_customer?(app)
+      app.decisioning_interface.military_lending_act_relevant?
+    rescue StandardError
+      false
     end
 
     def verify!(cca)

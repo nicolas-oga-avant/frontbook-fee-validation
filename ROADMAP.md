@@ -192,12 +192,45 @@ Shipped as `.claude/skills/test-frontbook-fee-launch/`.
 ### 1.5 MLA forcing
 
 Needed in Phase 1: 12 of the 28 codes are MLA variants, and a teammate asking for one today gets
-told it is unrunnable.
+told it is unrunnable. It turned out to matter for the other 16 too - see FINDINGS #33.
 
-- [ ] `zzz_local_mla_stub.rb`, patching **only** `raw_test_data`'s `transunion_mla` branch
-- [ ] Backed up into `local-stack/` and wired into `restore.sh`
-- [ ] Asserts `military_lending_act_confirmed` is true **and** the resolved strategy is the MLA code
-- [ ] One MLA Run rendered end to end (`3M33`)
+- [x] ~~`zzz_local_mla_stub.rb`, patching **only** `raw_test_data`'s `transunion_mla` branch~~
+      **Wrong target.** The card policy pulls the MLA report through the report manager
+      (`pull_using_report_manager?(:transunion_mla)`), so `raw_test_data` never runs on this flow
+      and the hardcoded `:mla_negative_stub` blocks nothing. FINDINGS #3 named the wrong method
+- [x] The real block is the reverse of the one recorded: `FakeTransunion#get_mla_report` defaults
+      **every** applicant to the positive fixture, so locally everyone is a covered borrower.
+      Verified on application 7 (`0120`, last name `approved`): MLA confirmed true. 12 of the 16
+      URL-reachable codes have an M variant, so each would have silently issued under it
+      (FINDINGS #33)
+- [x] `zzz_local_mla_stub.rb` dispatches `get_mla_report` on the last name, the way the sibling
+      reports already do: `mla` in the name gets the positive fixture, everyone else the negative
+      one. `raw_test_data` is patched identically so a non-report-manager policy cannot diverge
+  - [x] Both directions verified on the booted stack 2026-09-02: application 9 (`mlaapproved`)
+        confirms MLA, application 7 (`approved`) does not. The negative half is what keeps the 16
+        base-code Runs honest
+- [x] Backed up into `local-stack/` and wired into `restore.sh`, and into `bootstrap.sh`'s
+      patch list and boot-log assertion
+- [x] Asserts `military_lending_act_confirmed` is true **and** the resolved strategy is the MLA code
+  - [x] `LocalMlaStub.verify!(app, expected_code:)` checks the report, `military_lending_act_relevant?`
+        and the `code_to_mla` mapping off the decision path tag, reading Confetti's mapping rather
+        than a local copy
+  - [x] `LocalCmaStub` made MLA-aware: the decision path tag holds the **base** code, so comparing
+        it raw against the account's `3M33` failed every MLA Run. It now maps through `code_to_mla`
+        when the application is an MLA customer
+- [x] **One MLA Run rendered end to end (`3M33`). All fee assertions PASS.** Application 9 ->
+      account 3, applied under base `3303` with last name `mlaapproved`, decisioned `3303`, issued
+      under `3M33`, rendered against the same production draft as the `0122`/`0120` Pair
+      (`bd8382f5-...`). Evidence in `evidence/run-3M33/`
+  - [x] `$30`/`$41` late fee sentence, 3% FX paragraph, conversion-rate-costs clause and both
+        summary FX rows present; every one of them absent on the `0120` control, so none is a
+        vacuous pass. APR 35.99, annual fee $0 year one / $39 after, as the matrix expects
+  - [x] The `3M33` config comes from `3303`: `cma_pricing_strategy_config` falls back to
+        `code_to_mla.key(identifier)` when the M code has no Confetti entry of its own, which is
+        why an MLA account is not quoted backbook fees. That fallback is production code, unpatched
+  - [x] A naive "no stale `$39`" check fails on this Run and is a **checker** limitation, not a
+        result: `$39` is the year-two annual fee the matrix expects. The late fee sentence is
+        pinned whole, so the amount is asserted where it matters
 
 ### 1.6 Assertions
 
@@ -298,8 +331,12 @@ walked - most of the cost of this project so far came from assuming a documented
 
 ## Open items not owned by any ticket
 
-- [ ] File the one-line `raw_test_data` defect in `avant-basic` (FINDINGS #3). It blocks the six
-      backbook MLA Runs too, so no other dependency resolves it
+- [ ] File the one-line `raw_test_data` defect in `avant-basic` (FINDINGS #3). It is real, but it
+      is **not** what blocked the MLA Runs - the card policy never reaches that method (FINDINGS
+      #33), so this is now a tidy-up, not a blocker
+- [ ] Worth a ticket of its own: `FakeTransunion#get_mla_report` defaulting every applicant to a
+      positive MLA report (FINDINGS #33). It is spec-affecting, not just local - any spec that
+      pulls an MLA report without pinning an SSN gets a covered borrower it did not ask for
 - [ ] `roll_pricing_strategy_configuration` still rolls 100% to `0120`, so no application is ever
       *organically* assigned a frontbook code. Does not block URL-driven testing. Flagged on CSRV-5297
 - [ ] CSRV-5823 tracks the deferred prd Confetti promotion
