@@ -26,12 +26,13 @@ No patch is needed and preview mode keeps it safe - see
 `docs/adr/0002-render-drafts-against-production-templateflow.md`. Provenance is the
 `template_version_uuid` the render returns; no `git_sha_version` exists anywhere yet (FINDINGS #18).
 
-## Dependency state as of 2026-09-01
+## Dependency state as of 2026-09-02
 
 | Dependency | State |
 | --- | --- |
 | avant-basic#5928 (CSRV-5298, `cma_fee_terms`) | **Merged** 2026-08-28 into `main` |
 | avant-templates#74 (CSRV-5299, CMA content) | **Open, draft**, base `main` |
+| Production CMA draft (template 9658, consolidated) | **v7 draft carries the new fee content** (FINDINGS #21) |
 | CSRV-4904 (template extraction to git-backed Liquid) | Merged |
 | Confetti `basic.pricing_strategy` (fees) | v17, dev and prd |
 | Confetti param-to-id / apr-caps (+8 UUIDs) | dev only; prd promotion deferred to CSRV-5823 |
@@ -80,8 +81,18 @@ Shipped as `.claude/skills/test-frontbook-fee-launch/`.
       **stored** `template_variables`. The other two both fail for reasons that never mention the
       agreement (FINDINGS #19)
 - [x] Re-extracted the `0122` baseline. **Compare fee content, not bytes** (FINDINGS #20)
-- [ ] Confirm the draft at `/templates/9658/edit` carries the new fee content, and map template
-      **9658** (a numeric UI id) to the uuid basic resolves for `credit_card_cardmember_agreement_1`
+- [x] Confirmed 2026-09-02: the **v7 Draft** of template 9658 carries the new fee content, matching
+      avant-templates#74 at all five assertion points, with no hardcoded `$28`/`$39` (FINDINGS #21)
+- [x] ~~map template **9658** to the uuid basic resolves for `credit_card_cardmember_agreement_1`~~
+      **Wrong premise.** 9658 is `5d5b0b5c-...` = `credit_card_cardmember_agreement_consolidated`.
+      `_1` is `0b480903-...`, whose newest version is an approved v32 from March with **none** of the
+      fee variables. FINDINGS #18 named the wrong render target
+- [ ] **Force `show_consolidated_cma?` locally**, via the `needs_consolidated_cma` scenario - the
+      Optimizely-flag and cutoff-date paths both default false on the local stack. Without it a Run
+      renders `_1` and reports `$28`/`$39` with no FX paragraph for reasons unrelated to the fee
+      launch: a frontbook code that silently passes as backbook (FINDINGS #21)
+- [ ] Assert the resolved template name per Run, and stamp the Template ID **and** Version ID the
+      render returns onto the Attempt
 - [ ] Assert `preview` is on for every render. If the stack ever becomes `acts_as_prod?`, drafts stop
       rendering **and** documents start persisting to production
 

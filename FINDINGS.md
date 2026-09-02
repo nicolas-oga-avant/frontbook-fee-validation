@@ -497,6 +497,9 @@ runs, or drive the application through real decisioning rather than the dashboar
 
 ## 18. Ocala TemplateFlow is not git-backed, so there is no Template Version to read
 
+**Superseded in part by FINDINGS #21:** the template named below is *not* the one carrying the fee
+content. The git-backing observation stands; the render target does not.
+
 Verified 2026-09-01 against `templateflow.ocala.k8s.dev.global.avant.com`, template
 `Letter - Cardmember Agreement (CMA) - Key: 1` (`0b480903-330d-42cd-9cb5-7cff942c44f9`), which is
 what `credit_card_cardmember_agreement_1` resolves to:
@@ -551,3 +554,43 @@ $39, no FX paragraph, and the only `3%` is the cash advance sentence - but the d
 So `evidence/baseline/cma_0122_local.html` was rendered against a *different* TemplateFlow instance
 than the one the stack now points at. Compare **fee content**, never bytes, when checking that a
 baseline reproduces.
+
+## 21. Template 9658 is the *consolidated* CMA, not `credit_card_cardmember_agreement_1`
+
+Verified 2026-09-02 against production `templateflow.avant.com`.
+
+| Template | UI id | Template ID | Latest version | Carries the new fee content? |
+| --- | --- | --- | --- | --- |
+| `credit_card_cardmember_agreement_consolidated` | 9658 | `5d5b0b5c-9e69-4bb4-aaa5-68581f7e7c93` | **v7, Draft** (`bd8382f5-fe63-409f-8d58-11104b01def5`) | **Yes** |
+| `credit_card_cardmember_agreement_1` | - | `0b480903-330d-42cd-9cb5-7cff942c44f9` | v32, Approved 2026-03-20 | **No** |
+
+The 9658 draft is titled "Cardmember Agreement (CMA) 2026" and its content matches
+avant-templates#74 at all five assertion points: `{{ late_fee_initial }}` and
+`{{ late_fee_subsequent }}` in the Late Fee paragraph, `{{ late_fee_subsequent }}` in the rate
+summary, the `{% if foreign_transaction_fee %}` FX paragraph, the gated summary row that falls back
+to `None`, and the gated "conversion rate costs" clause. **No hardcoded `$28` or `$39` remain**, and
+no literal `$30`/`$41` were pasted in - the amounts come from the variables, as intended.
+
+`0b480903` has none of the three variables and still hardcodes `$28`/`$39`. Its newest version is an
+*approved* v32 from March; there is no pending draft on it.
+
+**This invalidates the render target FINDINGS #18 and the ROADMAP assumed.** A Run only exercises
+the content under test if `cardmember_agreement_template_name` resolves to
+`:credit_card_cardmember_agreement_consolidated`, which requires `show_consolidated_cma?`
+(`app/models/credit_card_account/cardmember_agreement_inputs.rb:27-32`) to be true:
+
+```ruby
+return false unless consolidated_cma_enabled?          # optimizely_feature :consolidated_cma
+cutoff_date = Avant::Env::CardmemberAgreement.consolidated_cma_cutoff_date
+(cutoff_date && issued_at > cutoff_date) ||
+  scenario_enabled?(::CreditCardAccount::Scenarios::NEEDS_CONSOLIDATED_CMA)
+```
+
+Locally the Optimizely client is stubbed and `CONSOLIDATED_CMA_CUTOFF_DATE` is unset, so the default
+path returns false and a Run renders `_1` - hardcoded `$28`/`$39`, no FX paragraph, **for reasons
+that have nothing to do with the fee launch**. That is exactly the silent wrong-answer this project
+exists to avoid: it looks like a clean backbook pass on a frontbook code.
+
+The `needs_consolidated_cma` scenario is the lever that does not depend on Optimizely. Every Run
+must assert the resolved template name, and record the Template ID and Version ID returned by the
+render, before trusting any fee assertion.
