@@ -27,6 +27,13 @@
 # processing sets, and which CreditCardAccount#onboarding_request_has_been_processed_by_fdr?
 # checks. prepare! fills in that field and nothing else.
 #
+# ## It also forces the consolidated agreement
+#
+# prepare! tags the account needs_consolidated_cma and verify! refuses to return unless the
+# resolved template is the consolidated one. The fee variables exist only there; _1 hardcodes
+# $28/$39, so a Run on _1 reports backbook amounts for any pricing strategy and nothing errors
+# (FINDINGS #21). The tag needs zzz_local_consolidated_cma.rb loaded to have any effect.
+#
 # ## Known limitation, not caused by this helper
 #
 # A locally-approved application has no product decision, so the
@@ -45,6 +52,11 @@ module LocalCmaStub
   REQUIRED_RATES = %w[purchase_daily_rate cash_advance_daily_rate].freeze
 
   STRATEGY_TAG_KEY = 'avant_card_initial_strategy'.freeze
+
+  # The fee content under test exists only on the consolidated agreement; _1 still hardcodes
+  # $28/$39 (FINDINGS #21). Every Run must land here, whether it expects frontbook or backbook
+  # amounts - a backbook expectation is only meaningful on the template the fees can appear on.
+  CONSOLIDATED_TEMPLATE = :credit_card_cardmember_agreement_consolidated
 
   class << self
     # @param allow_unissued [Boolean] escape hatch; the payload is then whatever the account has,
@@ -77,6 +89,10 @@ module LocalCmaStub
       cca.update!(final_account: payload)
       cca.invalidate_cached_account!
 
+      # Opens the Optimizely guard too - see zzz_local_consolidated_cma.rb. Without this the
+      # account renders _1 and reports $28/$39 for any pricing strategy.
+      cca.add_scenario!(::CreditCardAccount::Scenarios::NEEDS_CONSOLIDATED_CMA)
+
       verify!(cca)
     end
 
@@ -84,8 +100,9 @@ module LocalCmaStub
       guard_environment!
       cca = resolve(account)
       cca.update!(final_account: nil)
+      cca.remove_scenario!(::CreditCardAccount::Scenarios::NEEDS_CONSOLIDATED_CMA)
       cca.invalidate_cached_account!
-      { credit_card_account_id: cca.id, stubbed: false }
+      { credit_card_account_id: cca.id, stubbed: false, consolidated_cma_forced: false }
     end
 
     def status(account)
@@ -97,6 +114,8 @@ module LocalCmaStub
         pricing_strategy: safe { cca.current_cardholder_pricing_strategy_identifier },
         decisioned_pricing_strategy: decisioned_pricing_strategy(cca),
         onboarding_ok: safe { cca.onboarding_request_has_been_processed_by_fdr? },
+        consolidated_cma_forced: cca.scenario_enabled?(::CreditCardAccount::Scenarios::NEEDS_CONSOLIDATED_CMA),
+        show_consolidated_cma: safe { cca.show_consolidated_cma? },
         servicing_account: cca.servicing_account&.id,
         cma_template: safe { cca.servicing_account&.interface&.cardmember_agreement_template_name },
       }
@@ -177,13 +196,25 @@ module LocalCmaStub
         raise Error, 'stub did not take: onboarding gate still closed'
       end
 
+      # Assert the template rather than trusting the tag. The tag is one of three conditions
+      # show_consolidated_cma? reads, and the render itself gives no hint which template it used.
+      template = cca.servicing_account&.interface&.cardmember_agreement_template_name
+      if template&.to_sym != CONSOLIDATED_TEMPLATE
+        raise Error, "resolved CMA template is #{template.inspect}, not #{CONSOLIDATED_TEMPLATE}. " \
+                     'Only the consolidated agreement carries the fee variables, so a render now ' \
+                     'would report backbook amounts whatever the pricing strategy (FINDINGS #21). ' \
+                     'Is zzz_local_consolidated_cma.rb loaded? Check the boot log for ' \
+                     '[local] LocalConsolidatedCma.'
+      end
+
       {
         credit_card_account_id: cca.id,
         stubbed: true,
         product_status: cca.status,
         pricing_strategy: cca.current_cardholder_pricing_strategy_identifier,
         onboarding_ok: true,
-        cma_template: cca.servicing_account&.interface&.cardmember_agreement_template_name,
+        cma_template: template,
+        consolidated_cma_forced: true,
         revert_with: "LocalCmaStub.revert!(#{cca.id})",
       }
     end

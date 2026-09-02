@@ -96,10 +96,18 @@ Shipped as `.claude/skills/test-frontbook-fee-launch/`.
       **Wrong premise.** 9658 is `5d5b0b5c-...` = `credit_card_cardmember_agreement_consolidated`.
       `_1` is `0b480903-...`, whose newest version is an approved v32 from March with **none** of the
       fee variables. FINDINGS #18 named the wrong render target
-- [ ] **Force `show_consolidated_cma?` locally**, via the `needs_consolidated_cma` scenario - the
-      Optimizely-flag and cutoff-date paths both default false on the local stack. Without it a Run
-      renders `_1` and reports `$28`/`$39` with no FX paragraph for reasons unrelated to the fee
-      launch: a frontbook code that silently passes as backbook (FINDINGS #21)
+- [ ] **Force `show_consolidated_cma?` locally.** Without it a Run renders `_1` and reports
+      `$28`/`$39` with no FX paragraph for reasons unrelated to the fee launch: a frontbook code
+      that silently passes as backbook (FINDINGS #21)
+  - [x] `zzz_local_consolidated_cma.rb` lets the `needs_consolidated_cma` tag past the Optimizely
+        guard, per account rather than globally; backed up and wired into `restore.sh`
+  - [x] `LocalCmaStub.prepare!` sets the tag, `revert!` drops it, `status` reports both the tag and
+        `show_consolidated_cma?`
+  - [x] `verify!` refuses to return unless the resolved template is the consolidated one, naming
+        the boot-log line to check when it is not
+  - [ ] **Not yet run against a booted stack.** Syntax-checked only; `to_prepare` prepend ordering,
+        `add_scenario!` and the `show_consolidated_cma?` flip are all unverified until 1.1's clean
+        bootstrap run happens
 - [ ] Assert the resolved template name per Run, and stamp the Template ID **and** Version ID the
       render returns onto the Attempt
 - [ ] Assert `preview` is on for every render. If the stack ever becomes `acts_as_prod?`, drafts stop
