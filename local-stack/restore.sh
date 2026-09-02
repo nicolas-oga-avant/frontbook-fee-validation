@@ -76,9 +76,9 @@ if [ "${1:-}" = "--up" ]; then
 
   echo
   echo "Starting stacks..."
-  (cd "$ROOT/avant-basic"     && docker compose -p basic-csrv-5300 up -d web sidekiq)
-  (cd "$ROOT/credit-card-api" && docker compose -p ccapi-csrv-5300 up -d web sidekiq)
-  (cd "$ROOT/crm"             && docker compose -p crm-csrv-5300  up -d web)
+  (cd "$ROOT/avant-basic"     && docker compose -p basic-frontbook-fee-validation up -d web sidekiq)
+  (cd "$ROOT/credit-card-api" && docker compose -p ccapi-frontbook-fee-validation up -d web sidekiq)
+  (cd "$ROOT/crm"             && docker compose -p crm-frontbook-fee-validation  up -d web)
   echo
   echo "Waiting for basic (first boot restores a large DB dump, several minutes)..."
   until [ "$(curl -s -m 8 -o /dev/null -w '%{http_code}' http://localhost:5001/ 2>/dev/null)" = "200" ]; do sleep 10; done
@@ -86,7 +86,7 @@ if [ "${1:-}" = "--up" ]; then
   # The CRM client bundle lives in the container's writable layer, so any recreate loses it and
   # every request 500s on `Failed to lookup view "login.ejs"`.
   echo "Building the CRM client bundle (required after any recreate, ~53s)..."
-  (cd "$ROOT/crm" && docker compose -p crm-csrv-5300 exec -T web sh -c 'cd /app && yarn webpack' >/dev/null)
+  (cd "$ROOT/crm" && docker compose -p crm-frontbook-fee-validation exec -T web sh -c 'cd /app && yarn webpack' >/dev/null)
   echo "  crm    ready on :4000"
   echo "  ccapi  on :7100"
 else
@@ -94,10 +94,10 @@ else
 
 Now bring the stacks up (or re-run with --up):
 
-  cd ~/Source/avant/avant-basic     && docker compose -p basic-csrv-5300 up -d web sidekiq
-  cd ~/Source/avant/credit-card-api && docker compose -p ccapi-csrv-5300 up -d web sidekiq
-  cd ~/Source/avant/crm             && docker compose -p crm-csrv-5300  up -d web
-  cd ~/Source/avant/crm && docker compose -p crm-csrv-5300 exec web sh -c 'cd /app && yarn webpack'
+  cd ~/Source/avant/avant-basic     && docker compose -p basic-frontbook-fee-validation up -d web sidekiq
+  cd ~/Source/avant/credit-card-api && docker compose -p ccapi-frontbook-fee-validation up -d web sidekiq
+  cd ~/Source/avant/crm             && docker compose -p crm-frontbook-fee-validation  up -d web
+  cd ~/Source/avant/crm && docker compose -p crm-frontbook-fee-validation exec web sh -c 'cd /app && yarn webpack'
 
 basic :5001   ccapi :7100   CSP :4000/us/
 EOF

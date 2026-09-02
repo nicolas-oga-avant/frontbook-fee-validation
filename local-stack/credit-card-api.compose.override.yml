@@ -1,6 +1,6 @@
 # Untracked local override: CCAPI wired to LOCAL basic and DEV's FDR gateway.
 #
-#   docker compose -p ccapi-csrv-5300 up -d web
+#   docker compose -p ccapi-frontbook-fee-validation up -d web
 #
 # Rationale for each entry is a failure that actually happens without it.
 services:

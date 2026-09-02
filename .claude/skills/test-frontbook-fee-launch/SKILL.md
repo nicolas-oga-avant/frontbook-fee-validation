@@ -153,7 +153,7 @@ Run against basic:
 
 ```bash
 cd "$VALIDATION_ROOT/avant-basic"
-docker compose -p basic-csrv-5300 exec -T web bundle exec rails runner /usr/src/app/tmp/<script>.rb
+docker compose -p basic-frontbook-fee-validation exec -T web bundle exec rails runner /usr/src/app/tmp/<script>.rb
 ```
 
 `rails runner` is not a console: it has no Optimizely client, so **start every script with

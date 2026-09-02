@@ -61,10 +61,10 @@ That restores the untracked overrides, re-excludes them, starts all three stacks
 and builds the CRM client bundle. Manually, it is:
 
 ```bash
-docker compose -p basic-csrv-5300 up -d web sidekiq     # localhost:5001
-docker compose -p ccapi-csrv-5300 up -d web sidekiq     # localhost:7100
-docker compose -p crm-csrv-5300  up -d web              # localhost:4000
-docker compose -p crm-csrv-5300  exec web sh -c 'cd /app && yarn webpack'   # REQUIRED, ~53s
+docker compose -p basic-frontbook-fee-validation up -d web sidekiq     # localhost:5001
+docker compose -p ccapi-frontbook-fee-validation up -d web sidekiq     # localhost:7100
+docker compose -p crm-frontbook-fee-validation  up -d web              # localhost:4000
+docker compose -p crm-frontbook-fee-validation  exec web sh -c 'cd /app && yarn webpack'   # REQUIRED, ~53s
 ```
 
 Project names are ticket-scoped so they cannot collide with another session's stacks.
@@ -97,8 +97,8 @@ The override names `AVANT_TEMPLATES_API_KEY` with no value, so Compose passes it
 shell that ran `up`. Env vars are baked at container creation, so after changing it:
 
 ```bash
-docker compose -p basic-csrv-5300 up -d --force-recreate web sidekiq   # basic only, never CRM
-docker compose -p basic-csrv-5300 exec web sh -c 'printenv AVANT_TEMPLATES_HOST; printenv AVANT_TEMPLATES_API_KEY | wc -c'
+docker compose -p basic-frontbook-fee-validation up -d --force-recreate web sidekiq   # basic only, never CRM
+docker compose -p basic-frontbook-fee-validation exec web sh -c 'printenv AVANT_TEMPLATES_HOST; printenv AVANT_TEMPLATES_API_KEY | wc -c'
 ```
 
 A character count of 1 means the value never reached the container, and every render will 401.

@@ -31,19 +31,24 @@ ok "docker daemon"
 info "TemplateFlow key comes from .env.local - see below"
 
 # Compose project names are fixed, so a stack already running from a DIFFERENT directory
-# will be recreated against $VALIDATION_ROOT - taking its database and any issued accounts
-# with it. Refuse rather than silently destroy someone's in-progress run.
-running_dir="$(docker inspect basic-csrv-5300-web-1 \
+# will be recreated against $VALIDATION_ROOT. The database itself survives - it lives on the
+# named volume <project>_ab_postgres16_data, which is keyed to the project name rather than
+# the working directory, so `down` (without -v) keeps it and the next `up` reattaches it.
+# What does break is the schema: the new checkout can sit at a different SHA than the one
+# those migrations ran under. Refuse rather than silently reshape someone's in-progress run.
+running_dir="$(docker inspect basic-frontbook-fee-validation-web-1 \
   --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' 2>/dev/null || true)"
 if [ -n "$running_dir" ] && [ "$running_dir" != "$VALIDATION_ROOT/avant-basic" ]; then
-  die "a basic-csrv-5300 stack is already running from:
+  die "a basic-frontbook-fee-validation stack is already running from:
     $running_dir
   but this bootstrap targets:
     $VALIDATION_ROOT/avant-basic
-  Continuing would recreate those containers against a different checkout and lose the
-  database, including any issued accounts. Either set VALIDATION_ROOT to the directory
-  above, or stop the other stack first:
-    docker compose -p basic-csrv-5300 down"
+  Continuing would recreate those containers against a different checkout. The database
+  survives on its named volume, but it would then be serving a checkout it was never
+  migrated for. Either set VALIDATION_ROOT to the directory above, or stop the other
+  stack first:
+    docker compose -p basic-frontbook-fee-validation down
+  (\`down\` keeps the volume; only \`down -v\` destroys the data.)"
 fi
 
 
@@ -126,9 +131,9 @@ fi
 # --- 5. stack --------------------------------------------------------------------------
 step "Stack"
 if [ "$VERIFY_ONLY" != "--verify" ]; then
-  (cd "$VALIDATION_ROOT/avant-basic"     && docker compose -p basic-csrv-5300 up -d web sidekiq >/dev/null)
-  (cd "$VALIDATION_ROOT/credit-card-api" && docker compose -p ccapi-csrv-5300 up -d web sidekiq >/dev/null)
-  (cd "$VALIDATION_ROOT/crm"             && docker compose -p crm-csrv-5300  up -d web >/dev/null)
+  (cd "$VALIDATION_ROOT/avant-basic"     && docker compose -p basic-frontbook-fee-validation up -d web sidekiq >/dev/null)
+  (cd "$VALIDATION_ROOT/credit-card-api" && docker compose -p ccapi-frontbook-fee-validation up -d web sidekiq >/dev/null)
+  (cd "$VALIDATION_ROOT/crm"             && docker compose -p crm-frontbook-fee-validation  up -d web >/dev/null)
   info "waiting for basic (first boot restores a large DB dump - can be several minutes)"
 fi
 
@@ -138,7 +143,7 @@ for i in $(seq 1 60); do
   sleep 10
 done
 [ "${code:-}" = "200" ] || die "basic never returned 200 on :5001 (last: ${code:-none}).
-  Check: docker compose -p basic-csrv-5300 logs --tail=50 web"
+  Check: docker compose -p basic-frontbook-fee-validation logs --tail=50 web"
 ok "basic :5001"
 
 curl -s -o /dev/null -m 20 http://localhost:7100/ 2>/dev/null && ok "ccapi :7100" \
@@ -148,29 +153,29 @@ curl -s -o /dev/null -m 20 http://localhost:7100/ 2>/dev/null && ok "ccapi :7100
 # and every request 500s on `Failed to lookup view "login.ejs"`.
 if [ "$VERIFY_ONLY" != "--verify" ]; then
   info "building the CRM client bundle (~53s, required after any recreate)"
-  (cd "$VALIDATION_ROOT/crm" && docker compose -p crm-csrv-5300 exec -T web sh -c 'cd /app && yarn webpack' >/dev/null 2>&1) || true
+  (cd "$VALIDATION_ROOT/crm" && docker compose -p crm-frontbook-fee-validation exec -T web sh -c 'cd /app && yarn webpack' >/dev/null 2>&1) || true
 fi
 crm_body="$(curl -s -m 20 http://localhost:4000/us/ 2>/dev/null || true)"
 case "$crm_body" in
   *login.ejs*) die "CRM is serving the login.ejs error - the client bundle is missing.
-  Run: cd $VALIDATION_ROOT/crm && docker compose -p crm-csrv-5300 exec web sh -c 'cd /app && yarn webpack'" ;;
+  Run: cd $VALIDATION_ROOT/crm && docker compose -p crm-frontbook-fee-validation exec web sh -c 'cd /app && yarn webpack'" ;;
   *) ok "crm :4000" ;;
 esac
 
 # --- 6. the things that fail silently --------------------------------------------------
 step "Silent-failure checks"
-mocks="$(cd "$VALIDATION_ROOT/avant-basic" && docker compose -p basic-csrv-5300 exec -T web \
+mocks="$(cd "$VALIDATION_ROOT/avant-basic" && docker compose -p basic-frontbook-fee-validation exec -T web \
   sh -c 'printenv ENABLE_MOCK_SERVICES; printenv MOCK_TRANSUNION' 2>/dev/null | tr -d '\r' | paste -sd, -)"
 [ "$mocks" = "1,1" ] || die "mock env vars are '$mocks', expected '1,1'.
   Without them the TransUnion mock never registers and EVERY application declines with
   missing_transunion_report, with no mention of mocks anywhere."
 ok "ENABLE_MOCK_SERVICES + MOCK_TRANSUNION"
 
-tf="$(cd "$VALIDATION_ROOT/avant-basic" && docker compose -p basic-csrv-5300 exec -T web \
+tf="$(cd "$VALIDATION_ROOT/avant-basic" && docker compose -p basic-frontbook-fee-validation exec -T web \
   sh -c 'printenv AVANT_TEMPLATES_API_KEY | wc -c' 2>/dev/null | tr -d ' \r')"
 [ "${tf:-1}" -gt 1 ] || die "AVANT_TEMPLATES_API_KEY did not reach the container.
   Env is baked at container creation. Re-run:
-    cd $VALIDATION_ROOT/avant-basic && docker compose -p basic-csrv-5300 up -d --force-recreate web sidekiq
+    cd $VALIDATION_ROOT/avant-basic && docker compose -p basic-frontbook-fee-validation up -d --force-recreate web sidekiq
   Never --force-recreate CRM: it wipes the client bundle."
 ok "TemplateFlow key reached the container"
 

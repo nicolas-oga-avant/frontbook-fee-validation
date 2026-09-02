@@ -1,6 +1,6 @@
 # Untracked local override: basic wired to the LOCAL CCAPI.
 #
-#   docker compose -p basic-csrv-5300 up -d web sidekiq
+#   docker compose -p basic-frontbook-fee-validation up -d web sidekiq
 #
 services:
   web: &basic-env

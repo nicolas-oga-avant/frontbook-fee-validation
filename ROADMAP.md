@@ -68,7 +68,7 @@ Shipped as `.claude/skills/test-frontbook-fee-launch/`.
 - [x] Restores the local patches via `local-stack/restore.sh`, which takes `AVANT_ROOT`
 - [x] Starts all three stacks and waits for basic properly (cold start is ~7s+, first boot minutes)
 - [x] Builds the CRM client bundle, and fails loudly on the `login.ejs` symptom if it is missing
-- [x] Refuses to run when a `basic-csrv-5300` stack is already up from another directory, before
+- [x] Refuses to run when a `basic-frontbook-fee-validation` stack is already up from another directory, before
       doing any checkout work
 - [x] Verifies the silent failures: mock env vars, the key reaching the container, TemplateFlow
       accepting it

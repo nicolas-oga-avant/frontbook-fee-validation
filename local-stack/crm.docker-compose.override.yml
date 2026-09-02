@@ -6,8 +6,8 @@
 # Bring it up with a ticket-scoped project name so it cannot collide with other
 # sessions' compose projects:
 #
-#   docker compose -p crm-csrv-5300 up -d web
-#   docker compose -p crm-csrv-5300 exec web sh -c 'cd /app && yarn webpack'   # ~53s
+#   docker compose -p crm-frontbook-fee-validation up -d web
+#   docker compose -p crm-frontbook-fee-validation exec web sh -c 'cd /app && yarn webpack'   # ~53s
 #
 # The second step is NOT optional. Dockerfile.dev runs only `yarn build` (tsc); the
 # client bundle comes from `yarn webpack`. Without it every request 500s with
