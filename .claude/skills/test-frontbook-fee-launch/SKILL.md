@@ -114,22 +114,31 @@ the default stub ever stops approving.
 
 | Stage | What to do |
 | --- | --- |
-| `#/personal` | `AUTOFILL PERSONAL STAGE`; **set last name to `approved`**; fix the phone if the area code starts with `1`; tick consents |
-| `#/personal_continued` | `AUTOFILL`; **overwrite the entire address**; tick consents (an extra IL-specific one appears) |
-| `#/rates_terms` | autofill; **tick `creditHardPullConsent`** |
-| `#/password` | fill both password fields |
-| dashboard `/verify/<app_uuid>` | dev tools -> `Approve Product and Skip Ver`. It is off-canvas at x=2612; use `element.click()`, not a coordinate click |
-| `#/congratulations` | approved |
+| `#/personal` | `autofill_stage()`; **then** `set_tu_scenario("approved")` - autofill overwrites the last name, and the TU mock keys off it; `fix_autofill_phone()`; `tick_consents_dom()` |
+| `#/personal_continued` | `autofill_stage()`; **`fix_autofill_address()`** - overwrite the whole address; `tick_consents_dom()` (an extra IL-specific consent appears) |
+| `#/rates_terms` | `autofill_stage()`; `tick_consents_dom()` - `creditHardPullConsent` is the one that blocks approval |
+| `#/password` | `set_input("customer.password", ...)` and `customer.passwordConfirmation` |
+| after `CREATE PASSWORD` | redirects to `https://avant.staging-app.avant-test.com/verify/<app_uuid>`, which **this stack does not run**. The walk ends here; capture the app uuid from that URL |
+| approval | **server-side, in the console**: `CustomerApplication.find_by!(uuid: ...).product.approve!` |
 
-Five browser traps, all silent, all handled by the harness helpers:
+There is no dashboard step. The customer dashboard is a separate app that the local stack does not
+run, so `dev tools -> Approve Product and Skip Ver` cannot be performed - and that endpoint is
+broken on `main` regardless (FINDINGS #26, #32).
 
-1. Clicks below the fold do nothing - the accessibility box model returns *page* coordinates.
-2. **`scrollIntoView` does not take effect inside the same `js()` eval.** Scroll and measure in
+Six browser traps, all silent, all handled by the harness helpers:
+
+1. **Coordinate clicks do nothing on this flow.** A CDP mouse event on the submit button or a
+   consent checkbox reports success and has no effect - no error, no validation copy, only
+   `check_session_timeout` on the wire. Use `element.click()`: that is what `submit_stage()`,
+   `tick_consents_dom()` and `autofill_stage()` now do (FINDINGS #31).
+2. Clicks below the fold do nothing - the accessibility box model returns *page* coordinates.
+3. **`scrollIntoView` does not take effect inside the same `js()` eval.** Scroll and measure in
    separate calls. This is the single most important rule in the harness.
-3. Consent checkboxes are not HTML-`required`, so `checkValidity()` returns true while React refuses
+4. Consent checkboxes are not HTML-`required`, so `checkValidity()` returns true while React refuses
    to advance.
-4. `AUTOFILL` emits an invalid phone number and an internally inconsistent address.
-5. Dev-tools buttons on the dashboard are off-canvas.
+5. `AUTOFILL` emits an invalid phone number, an internally inconsistent address, and a last name
+   that undoes `set_tu_scenario`.
+6. The submit button's label differs on every stage, so select it by `type=submit`, never by text.
 
 If a stage will not advance and shows no error: blur every input, then re-read the page text. That
 surfaces the block.
@@ -277,8 +286,16 @@ different failure:
 | CSP late fee label | matches the agreement | that the two cannot disagree |
 
 **Absence is a positive assertion.** For a backbook code the foreign transaction paragraph must
-**not** render and the summary row must read `None`. "I did not find it" is a pass only if you
-looked.
+**not** render and the summary row must read `None`. "I did not find it" is a pass only if the check
+would have found it, so run it against a frontbook render as a control in the same pass:
+
+```bash
+python3 scripts/assert_cma_absence.py evidence/run-0120/cma_0120_log5.html \
+    --control evidence/run-0122/cma_0122_rerender.html
+```
+
+Every check must pass on the backbook document **and** fail on the control. One that passes on both
+is reported as `NO TEETH` and is worth nothing.
 
 **Layer 2 - the redline.** `data/redline-assertions.json` holds seven assertions derived from the
 L&C-approved document, with fee amounts parameterised. Substitute from the matrix row and compare

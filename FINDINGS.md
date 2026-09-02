@@ -858,3 +858,51 @@ grep finishes before the downstream one exits and nothing goes wrong, so the bug
 
 Read the log once into a variable and match with `case` instead. Any `producer | grep -q` in a
 `pipefail` script has this bug, including ones that currently pass.
+
+## 31. Coordinate clicks silently do nothing on the apply flow - use `element.click()`
+
+Found on the 0120 walk 2026-09-02, after four wasted iterations on `#/personal`.
+
+`click_text("CONTINUE APPLICATION")` measures the button, dispatches a real CDP mouse event at
+its center, and returns `"clicked"`. Nothing happens: the stage does not advance, no validation
+copy renders, `form.checkValidity()` is `true`, no element is `aria-invalid`, and the only
+network traffic is `check_session_timeout`. `surface_validation()` returns `[]`. It is
+indistinguishable from a form that is simply not ready.
+
+`element.click()` on the same button submits immediately - `submit_page` 200 and the stage
+advances. The same is true of the consent checkboxes (`tick_consents()` leaves them
+`checked: false`) and the dev-tools autofill button.
+
+Cause not fully pinned; the likely candidate is an overlay intercepting at those coordinates
+(the page carries a cookie-consent footer and the off-canvas dev-tools panel). What matters is
+that the failure is silent on the click side, so the harness now uses `element.click()` for the
+apply flow: `submit_stage()`, `tick_consents_dom()`, `autofill_stage()` and `dom_click_text()`.
+
+Two smaller traps in the same area:
+
+- **The submit button's label differs on every stage** - `CONTINUE APPLICATION`,
+  `COMPLETE THE APPLICATION AND CONTINUE`, `Send Confirmation Email And Continue`,
+  `CREATE PASSWORD`. Select `form.stage button[type=submit]`, never the text.
+- **Autofill overwrites the last name**, so `set_tu_scenario("approved")` must run *after*
+  autofill or the TransUnion mock returns a report for `Doeeg8` and the application declines.
+
+## 32. `SKILL.md`'s dashboard approval step never worked locally
+
+The runbook's Step 3 table ended with `dashboard /verify/<app_uuid>` ->
+`dev tools -> Approve Product and Skip Ver`. FINDINGS #26 had already recorded that this is
+impossible on a local stack - the dashboard is the separate customer-dashboard app, which this
+stack does not run - but the table was left as it was, so the 0120 walk followed it and hit the
+staging redirect again.
+
+After `CREATE PASSWORD` the flow redirects to
+`https://avant.staging-app.avant-test.com/verify/<app_uuid>` and the walk is over. Approve
+server-side instead, which is what the dev-tools mutation's non-G2 branch does anyway:
+
+```ruby
+app = CustomerApplication.find_by!(uuid: "<app_uuid>")
+app.product.approve!
+```
+
+The lesson is about the docs, not the platform: a corrected finding is not a corrected runbook.
+When a finding invalidates a step, edit the step in the same pass.
+

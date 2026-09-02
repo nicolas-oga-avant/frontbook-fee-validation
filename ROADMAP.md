@@ -169,7 +169,25 @@ Shipped as `.claude/skills/test-frontbook-fee-launch/`.
         `template_version_id` column and the letter writes the response's version to it on every
         render. The 0122 Run had recorded `bd8382f5-...` all along. FINDINGS #28 corrected;
         `LocalCmaRender` now reads it back and cross-checks it
-  - [ ] Re-walk `0120` (the backbook half of the Pair) for the absence assertions
+  - [x] **Re-walked `0120` end to end 2026-09-02. All absence assertions PASS.** Application 7
+        -> account 2, decisioned under `0120` (decision path tag confirms), issued, rendered
+        against the **same** template version as `0122` - `bd8382f5-...` - so the whole
+        difference between the Pair comes from Confetti, not from the template. Evidence in
+        `evidence/run-0120/`
+    - [x] Present: the late fee sentence with `$28`/`$39`, the pre-change foreign transactions
+          paragraph, `Up to $39` in the summary box
+    - [x] Absent: the FX disclosure paragraph, the conversion-rate-costs sentence, `3% of each
+          foreign transaction`, and any `$30`/`$41`. Summary Foreign Transaction cell reads
+          `None`
+    - [x] Every one of the nine checks **flips on the `0122` control**, so none of them is a
+          vacuous "did not find it" pass
+    - [x] Confetti explains it: `basic.pricing_strategy['0120']` carries no `late_fee_*` and no
+          `foreign_transaction_fee` key at all, so the template falls back to its Ruby defaults
+          and the FX disclosures stay ungated
+  - [x] Four silent browser traps cost four iterations and are now fixed in the harness rather
+        than in a transcript: coordinate clicks do nothing on this flow (FINDINGS #31), the
+        submit label differs per stage, autofill overwrites the last name the TU mock keys off,
+        and the runbook's dashboard approval step never worked locally (FINDINGS #32)
 
 ### 1.5 MLA forcing
 
@@ -185,9 +203,19 @@ told it is unrunnable.
 
 - [x] Layer 2 assertions derived from the approved redline into `data/redline-assertions.json`
 - [ ] Layer 1 value table, all five assertion points
-- [ ] Absence assertions for backbook codes: no FX paragraph, summary row reads `None`
-- [ ] Full-sentence matching, so the cash-advance `3%` cannot produce a false pass
+- [x] Absence assertions for backbook codes: no FX paragraph, summary row reads `None`
+  - [x] `scripts/assert_cma_absence.py`, sentences read from `data/redline-assertions.json`
+        rather than copied. Verified on `0120`
+  - [x] Takes a `--control` frontbook render and reports any check that passes on both
+        documents as `NO TEETH` - an absence check that cannot fail proves nothing
+- [x] Full-sentence matching, so the cash-advance `3%` cannot produce a false pass
+  - [x] The summary box flattens to labels-then-values, so the Foreign Transaction cell cannot
+        be asserted alone. The check pins the whole row, which fixes the cell at `None` *and*
+        proves the cash advance sentence is still intact
 - [ ] Assertion failures reported as results, never quietly fixed to make a Run proceed
+  - [x] Both first-pass failures on `0120` were the checker's own patterns, not the document -
+        confirmed by reading the flattened text before touching them. The distinction is now in
+        the script's docstring, since the output cannot show it
 
 ### 1.7 Done when
 

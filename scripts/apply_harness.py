@@ -11,6 +11,13 @@ page_info, goto_url, wait, wait_for_load, switch_tab, press_key:
 The single most important rule: **scroll and measure must be separate js() calls.**
 scrollIntoView does not take effect within the eval that calls it, so a rect measured in
 the same call is the pre-scroll one, and the click lands somewhere harmless with no error.
+
+The second rule, from the 0120 walk: **on this flow, click with element.click(), not with a
+coordinate click.** Coordinate clicks on the stage form's submit button and on the consent
+checkboxes report success, dispatch cleanly, and do nothing - no error, no navigation, and
+only tracking traffic on the wire. element.click() submits every time. autofill_stage(),
+tick_consents_dom() and submit_stage() below all use it; click_sel/click_text remain for
+elements where a real mouse event matters. See FINDINGS #31.
 """
 
 import csv
@@ -286,21 +293,72 @@ def stage():
     return (page_info()["url"].split("#")[-1] or "").lstrip("/")
 
 
+def dom_click_text(txt_or_regex, regex=False):
+    """element.click() on the button whose text matches. Prefer this over a coordinate click
+    on this flow - see the module docstring on silent no-op clicks."""
+    if regex:
+        finder = ("[...document.querySelectorAll('button,a,[role=button]')]"
+                  ".find(x => new RegExp(%s,'i').test(x.innerText.trim()))" % json.dumps(txt_or_regex))
+    else:
+        finder = ("[...document.querySelectorAll('button,a,[role=button]')]"
+                  ".find(x => x.innerText.trim().toUpperCase() === %s.toUpperCase())"
+                  % json.dumps(txt_or_regex))
+    return js("(() => { const e = %s; if(!e) return 'not found'; e.click(); "
+              "return 'clicked ' + e.innerText.trim().slice(0,40); })()" % finder)
+
+
 def autofill_stage():
-    """Dev tools render a per-stage button named AUTOFILL <STAGE> STAGE."""
-    if click_text("DEV TOOLS") != "clicked":
+    """Open dev tools, click this stage's autofill button, close the panel.
+
+    Every click here is element.click(): the panel renders off-canvas, and on the stage form
+    a coordinate click reports success and does nothing.
+    """
+    if "clicked" not in dom_click_text("DEV TOOLS"):
         return "no dev tools"
     wait(2)
-    hit = click_text("AUTOFILL %s STAGE" % stage().upper())
+    names = json.loads(js(
+        "JSON.stringify([...document.querySelectorAll('button')]"
+        ".map(b => b.innerText.trim()).filter(t => /^autofill/i.test(t)))"))
+    hits = [dom_click_text(n) for n in names]
     wait(3)
-    click_text("CLOSE")
+    dom_click_text("CLOSE")
     wait(1)
-    return hit
+    return hits or "no autofill button"
+
+
+def tick_consents_dom():
+    """Tick every unchecked checkbox in the stage form with element.click().
+
+    tick_consents() clicks by coordinate and silently leaves the box unchecked on this flow.
+    Returns the names it ticked.
+    """
+    return json.loads(js("""
+    (() => {
+      const r = [];
+      document.querySelectorAll('form.stage input[type=checkbox]').forEach(c => {
+        if (!c.checked) { c.click(); r.push(c.name); }
+      });
+      return JSON.stringify(r);
+    })()
+    """))
 
 
 def submit_stage():
-    """Submit via the form's own submit button."""
-    return click_sel("form button[type=submit]")
+    """Submit the stage form via its own submit button, by element.click().
+
+    Selected by `type=submit`, never by label: the label differs on every stage - CONTINUE
+    APPLICATION, COMPLETE THE APPLICATION AND CONTINUE, Send Confirmation Email And Continue,
+    CREATE PASSWORD - so matching on text fails on three of the four stages.
+    """
+    return js("""
+    (() => {
+      const b = document.querySelector('form.stage button[type=submit]');
+      if (!b) return 'no submit button';
+      if (b.disabled) return 'submit button disabled';
+      b.click();
+      return 'clicked ' + b.innerText.trim().slice(0, 40);
+    })()
+    """)
 
 
 def submitted_for_real(events):
