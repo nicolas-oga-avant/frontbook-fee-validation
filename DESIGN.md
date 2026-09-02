@@ -117,6 +117,19 @@ Instance selection is two env vars read by
 `avant-basic/config/initializers/templateflow_engine_client.rb`: `AVANT_TEMPLATES_HOST` and
 `AVANT_TEMPLATES_API_KEY`.
 
+**Two flags, not one.** `allow_unapproved` is what actually serves the draft: without it
+TemplateFlow answers with the newest *approved* version, which has no fee variables, so a frontbook
+Run reports backbook amounts and nothing errors (FINDINGS #29). Both flags are refused rather than
+warned about, before the request is sent, and the refusal is scoped to the cardmember agreement
+templates because loan contracts render `preview: false` legitimately
+(`local-stack/zzz_local_render_provenance.rb`).
+
+**A render is only evidence with its provenance attached.** Every Run stamps the Template ID, the
+Version ID and `all_version_uuids` beside the document, cross-checking the version recorded on
+`cardmember_agreement_logs.template_version_id` against the one seen on the wire - so a document
+carried over from an earlier render cannot pass as a fresh one. One render per agreement log
+(`local-stack/zzz_local_cma_render.rb`).
+
 ### 7. All 28 Runs are RENDERED - MLA is forced locally
 
 The 12 MLA Runs were thought unreachable. They are not: the block is one hardcoded line in

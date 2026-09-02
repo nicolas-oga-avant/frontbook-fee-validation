@@ -120,7 +120,9 @@ if [ "$VERIFY_ONLY" = "--verify" ]; then
   for f in docker-compose.override.yml \
            config/initializers/zzz_local_transunion_mock.rb \
            config/initializers/zzz_local_cma_stub.rb \
-           config/initializers/zzz_local_consolidated_cma.rb; do
+           config/initializers/zzz_local_consolidated_cma.rb \
+           config/initializers/zzz_local_render_provenance.rb \
+           config/initializers/zzz_local_cma_render.rb; do
     [ -f "$VALIDATION_ROOT/avant-basic/$f" ] || die "missing patch: avant-basic/$f"
   done
   ok "patches present"
@@ -179,16 +181,23 @@ tf="$(cd "$VALIDATION_ROOT/avant-basic" && docker compose -p basic-frontbook-fee
   Never --force-recreate CRM: it wipes the client bundle."
 ok "TemplateFlow key reached the container"
 
-# An initializer that exists on disk has told you nothing about whether it RAN. Both of these
-# log a [local] line at boot; assert on the log, not the file. Note the destination: Rails logs
+# An initializer that exists on disk has told you nothing about whether it RAN. Each of these
+# logs a [local] line at boot; assert on the log, not the file. Note the destination: Rails logs
 # to log/development.log INSIDE the container, so `docker compose logs` shows none of this.
-for want in 'LocalConsolidatedCma active' 'FakeTransunion mock registered'; do
-  (cd "$VALIDATION_ROOT/avant-basic" && docker compose -p basic-frontbook-fee-validation exec -T web \
-    sh -c 'grep -h "\[local\]" log/development.log 2>/dev/null' 2>/dev/null) | grep -qF "$want" \
-    || die "no '[local] $want' in log/development.log.
+#
+# Read the log ONCE into a variable and match with `case`. `grep ... | grep -qF` looks equivalent
+# and is not: the downstream grep exits on its first match, the upstream one dies of SIGPIPE, and
+# `set -o pipefail` turns that into a failed check on a log large enough that the write is still
+# in flight. It passes on a small log and fails on a big one.
+bootlog="$(cd "$VALIDATION_ROOT/avant-basic" && docker compose -p basic-frontbook-fee-validation exec -T web \
+  sh -c 'grep -h "\[local\]" log/development.log 2>/dev/null' 2>/dev/null || true)"
+for want in 'LocalConsolidatedCma active' 'LocalRenderProvenance active' 'FakeTransunion mock registered'; do
+  case "$bootlog" in
+    *"$want"*) ok "boot log: $want" ;;
+    *) die "no '[local] $want' in log/development.log.
   The initializer did not run, so the behaviour it provides is silently absent. Check that
-  local-stack/restore.sh put it in config/initializers/ and that the container was recreated."
-  ok "boot log: $want"
+  local-stack/restore.sh put it in config/initializers/ and that the container was recreated." ;;
+  esac
 done
 
 http="$(curl -s -o /dev/null -m 25 -w '%{http_code}' \

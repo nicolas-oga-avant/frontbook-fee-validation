@@ -15,6 +15,8 @@ checkouts deletes them. These are the backups.
 | `zzz_local_transunion_mock.rb` | `avant-basic/config/initializers/` |
 | `zzz_local_cma_stub.rb` | `avant-basic/config/initializers/` |
 | `zzz_local_consolidated_cma.rb` | `avant-basic/config/initializers/` |
+| `zzz_local_render_provenance.rb` | `avant-basic/config/initializers/` |
+| `zzz_local_cma_render.rb` | `avant-basic/config/initializers/` |
 | `credit-card-api.compose.override.yml` | `credit-card-api/compose.override.yml` |
 | `crm.docker-compose.override.yml` | `crm/docker-compose.override.yml` |
 
@@ -30,10 +32,15 @@ switch branches to accommodate them.
 | `zzz_local_transunion_mock.rb` | registers `FakeTransunion`, without which every local application declines (FINDINGS #14) |
 | `zzz_local_cma_stub.rb` | `LocalCmaStub` - fills the Fiserv-only fields so a freshly issued card can render a CMA (FINDINGS #15) |
 | `zzz_local_consolidated_cma.rb` | lets the `needs_consolidated_cma` tag past the Optimizely guard, so Runs render the consolidated CMA - the only template carrying the fee variables (FINDINGS #21) |
+| `zzz_local_render_provenance.rb` | refuses a CMA render unless `preview` and `allow_unapproved` are both on, and records the template version the render used (FINDINGS #22) |
+| `zzz_local_cma_render.rb` | `LocalCmaRender` - renders one agreement, asserts the template it resolved to, and stamps the version id onto the Run |
 | `credit-card-api.compose.override.yml` | live minio image, local basic, dev FDR gateway, and `CONFETTI_URL` (not `_URI`) |
 | `crm.docker-compose.override.yml` | CSP against local basic, password login instead of Okta, host port 4000 |
 
 The `zzz` prefix is load-bearing for `zzz_local_transunion_mock.rb`: it must run after
 `mock_services.rb`, which is what enables WebMock. `zzz_local_cma_stub.rb` only defines a module,
-and `zzz_local_consolidated_cma.rb` defers its prepend to `to_prepare`, so neither depends on load
-order - they keep the prefix for consistency.
+and `zzz_local_consolidated_cma.rb` and `zzz_local_render_provenance.rb` defer their prepends to
+`to_prepare`, so none of them depends on load order - they keep the prefix for consistency.
+
+`zzz_local_render_provenance.rb` requires `avant/templateflow/create_document` itself: `lib/` is not
+autoloaded, so the constant it prepends onto may not exist yet when the initializer runs.

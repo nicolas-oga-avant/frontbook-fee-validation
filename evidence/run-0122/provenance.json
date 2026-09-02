@@ -1,0 +1,30 @@
+{
+  "pricing_strategy": "0122",
+  "credit_card_account_id": 1,
+  "agreement_log_id": 2,
+  "template_name": "credit_card_cardmember_agreement_consolidated",
+  "template_id": "5d5b0b5c-9e69-4bb4-aaa5-68581f7e7c93",
+  "template_version_id": "bd8382f5-fe63-409f-8d58-11104b01def5",
+  "all_version_uuids": [
+    "bd8382f5-fe63-409f-8d58-11104b01def5",
+    "3e736999-456a-4782-9d11-0b6b68699a82",
+    "3cfd0ef7-c754-4c89-a697-1ce0a8cd16e1",
+    "ab90df05-2687-4db4-bf28-f718d76409db",
+    "12a3d619-3371-4667-9032-55e611ba0e1e",
+    "c0a605e4-054d-4282-b023-d8deae4b4ee1",
+    "5562db9e-986f-43ed-a875-9dbaf11a7a5d",
+    "caefcf5d-5866-4816-a3b1-378cfe04c5f0",
+    "822565eb-b7ed-4280-aab9-1f28998fa0e0",
+    "f2667d97-3dc7-4923-98ae-e174fa818054"
+  ],
+  "preview": true,
+  "allow_unapproved": true,
+  "templateflow_host": "templateflow.boston.k8s.prd.app.avant.com",
+  "rendered_at": "2026-09-02T13:52:33-05:00",
+  "draft_render": true,
+  "files": {
+    "html": "/usr/src/app/tmp/run-0122-provenance/cma_0122_log2.html",
+    "pdf": "/usr/src/app/tmp/run-0122-provenance/cma_0122_log2.pdf",
+    "provenance": "/usr/src/app/tmp/run-0122-provenance/cma_0122_log2.provenance.json"
+  }
+}

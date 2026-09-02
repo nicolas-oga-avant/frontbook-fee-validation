@@ -49,10 +49,13 @@ Miami/FL address with a Chicago ZIP. Both look right.
    *result* - possibly the defect this whole campaign exists to find. Record it and move on.
    Mechanical Failures (a click that missed, a stack that is down) are yours to fix. `CONTEXT.md`
    defines the split; if you are unsure which one you are looking at, it is an Assertion Failure.
-3. **Never issue a non-preview render.** Renders go against **production** TemplateFlow, which is
-   safe only because `preview: true` keeps them from persisting. Assert preview is on rather than
-   assuming it: anything that makes the stack `acts_as_prod?` flips it off silently, and the render
-   both stops picking up the draft under test and starts writing to production. See
+3. **Never issue a non-preview render, and never one without `allow_unapproved`.** Renders go
+   against **production** TemplateFlow, which is safe only because `preview: true` keeps them from
+   persisting, and reaches the draft under test only because `allow_unapproved: true` asks for it.
+   Assert both rather than assuming them: anything that makes the stack `acts_as_prod?` flips both
+   off silently, and without `allow_unapproved` TemplateFlow answers with the newest *approved*
+   version, which has no fee variables - a frontbook Run then reports backbook amounts and nothing
+   errors (FINDINGS #29). `zzz_local_render_provenance.rb` enforces this for CMA renders. See
    `docs/adr/0002-render-drafts-against-production-templateflow.md`.
 4. **Never commit to the repo checkouts.** They are shared with other agent sessions. All overrides
    are untracked by design and backed up in `local-stack/`. Never switch a checkout's branch to
@@ -125,7 +128,7 @@ AGENTS.md      this file - entry point and rules (README.md, CLAUDE.md are symli
 ROADMAP.md     the objective, the two phases, dependency state, and the checklist
 DESIGN.md      what the skill is and why it is shaped this way
 SETUP.md       replicable environment setup, the services involved, and the traps
-FINDINGS.md    28 platform findings - every failure mode, with evidence
+FINDINGS.md    30 platform findings - every failure mode, with evidence
 CONTEXT.md     glossary
 
 .claude/skills/test-frontbook-fee-launch/

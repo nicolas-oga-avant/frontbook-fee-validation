@@ -789,13 +789,72 @@ Note `Avant::Templateflow::CreateDocument.call` returns a Verbalize result whose
 on failure with a message about using `call!`. Use `call!` in a `begin/rescue`, or the real 422 stays
 hidden behind a misleading `Verbalize::Failure` error.
 
-## 28. The letter render path does not expose `template_version_uuid`
+## 28. ~~The letter render path does not expose `template_version_uuid`~~ It does
 
-ADR 0002 makes the version uuid the provenance for every Attempt, but nothing on the letter path
-persists it: `CardmemberAgreementLog` has no `template_version_uuid` column, and
-`RenderFromTemplate` only forwards it to a logger behind `should_log?`.
+**Wrong as originally written.** Corrected 2026-09-02. It said `CardmemberAgreementLog` has no
+column for the version and that the letter path only forwards it to a logger. Both are false on
+`main`:
 
-`Avant::Templateflow::CreateDocument.call!` **does** return it in the response body. So a Run that
-needs provenance has to either call `CreateDocument` itself with the full merged variable set, or
-capture the response inside the letter path. Recording the template uuid alone is not enough - see
-FINDINGS #22 for why a version, not a template, is what identifies the content under test.
+- `cardmember_agreement_logs.template_version_id` is a `uuid` column (`db/structure.sql:5226`).
+- `CardmemberAgreementLetter#render_from_templateflow!`
+  (`lib/avant/servicing_v2/communications/cardmember_agreement_letter.rb`) writes the response's
+  `template_version_uuid` to it on every render, and captures the resolved variable set on a log's
+  first render.
+
+The 0122 Run had recorded it all along: agreement log 1 carries
+`bd8382f5-fe63-409f-8d58-11104b01def5`. The finding was written from reading `RenderFromTemplate`
+alone, whose `should_log?` branch (`!preview && log_reference`) is indeed dead for a preview render -
+but that is the `TemplateFlowLog` audit record, not the only place the version lands.
+
+What is true: the *return value* of `render_pdf` is the PDF, so a caller that wants provenance must
+read it off the log afterwards, or capture the `CreateDocument` response. `LocalCmaRender` does
+both and cross-checks them, so a stale column cannot pass for a fresh render
+(`local-stack/zzz_local_cma_render.rb`).
+
+Two things worth knowing that came out of the correction:
+
+- `all_version_uuids` comes back **newest first**: the version in use is its first entry. Template
+  9658 had ten as of 2026-09-02.
+- `render_pdf` returns the stored document and sends no request when the log already has one, so a
+  reused log yields a document whose version id belongs to an earlier render. `LocalCmaRender`
+  refuses a log that already holds a document for exactly this reason. One render per log.
+
+## 29. `preview` and `allow_unapproved` are two separate silent failures, not one
+
+Hard rule 3 has always said to assert `preview`. `allow_unapproved` is the more dangerous of the
+two and was not being asserted at all.
+
+Both default to `!Avant::Env.acts_as_prod?`
+(`lib/avant/templateflow/create_document.rb:18-19`) and neither appears in the render output:
+
+| Flag off | Consequence |
+| --- | --- |
+| `preview` | drafts stop rendering **and** documents start persisting to production TemplateFlow |
+| `allow_unapproved` | TemplateFlow serves the newest *approved* version - v6, with no fee variables and `$28`/`$39` hardcoded (FINDINGS #22) |
+
+The second produces a frontbook Run reporting backbook amounts, with nothing raised and no way to
+tell it apart from a real backbook result. `zzz_local_render_provenance.rb` now refuses a
+cardmember agreement render unless both are on, before the request is sent.
+
+It is scoped to the three CMA template uuids on purpose: loan contracts pass `preview: false`
+legitimately (`app/models/loan_contract.rb:601,715`), and a global raise would break unrelated
+flows in the web process with a message about cardmember agreements.
+
+## 30. `grep | grep -q` under `set -o pipefail` fails once the log is big enough
+
+`bootstrap.sh` asserted the `[local]` initializer lines with:
+
+```bash
+docker compose exec -T web sh -c 'grep -h "\[local\]" log/development.log' | grep -qF "$want"
+```
+
+which passed on 2026-09-02 and died on the same stack an hour later, reporting the initializer had
+not run when the line was plainly in the log. The initializers were fine; the check was not.
+
+`grep -q` exits on its first match. The upstream `grep` is then still writing, takes SIGPIPE, and
+exits nonzero - and `set -o pipefail` reports the pipeline as failed. On a small log the upstream
+grep finishes before the downstream one exits and nothing goes wrong, so the bug only appears once
+`log/development.log` is large (21 MB here).
+
+Read the log once into a variable and match with `case` instead. Any `producer | grep -q` in a
+`pipefail` script has this bug, including ones that currently pass.

@@ -76,10 +76,13 @@ Shipped as `.claude/skills/test-frontbook-fee-launch/`.
       image build, the DB dump restore, and every silent-failure check green. `--verify` also 0
   - [ ] The `git clone` branch is still unexercised: all three repos already existed locally, so
         the run took the worktree path. Only a machine without the clones tests the other half
-- [x] Confirmed the `zzz_local_*` initializers load **from the boot log** - both `[local]` lines
-      appear under the unicorn pid. They go to `log/development.log` **inside the container**, not
-      to `docker compose logs`, which is why the obvious check comes up empty. Now asserted by
+- [x] Confirmed the `zzz_local_*` initializers load **from the boot log** - all three `[local]`
+      lines appear under the unicorn pid. They go to `log/development.log` **inside the container**,
+      not to `docker compose logs`, which is why the obvious check comes up empty. Now asserted by
       `bootstrap.sh` so it cannot regress silently
+  - [x] That assertion was itself broken: `grep | grep -q` under `set -o pipefail` fails once the
+        log is large enough, reporting a loaded initializer as missing. Rewritten to read the log
+        once and match with `case` (FINDINGS #30)
 
 ### 1.2 Credentials
 
@@ -103,7 +106,7 @@ Shipped as `.claude/skills/test-frontbook-fee-launch/`.
       **Wrong premise.** 9658 is `5d5b0b5c-...` = `credit_card_cardmember_agreement_consolidated`.
       `_1` is `0b480903-...`, whose newest version is an approved v32 from March with **none** of the
       fee variables. FINDINGS #18 named the wrong render target
-- [ ] **Force `show_consolidated_cma?` locally.** Without it a Run renders `_1` and reports
+- [x] **Force `show_consolidated_cma?` locally.** Without it a Run renders `_1` and reports
       `$28`/`$39` with no FX paragraph for reasons unrelated to the fee launch: a frontbook code
       that silently passes as backbook (FINDINGS #21)
   - [x] `zzz_local_consolidated_cma.rb` lets the `needs_consolidated_cma` tag past the Optimizely
@@ -121,10 +124,30 @@ Shipped as `.claude/skills/test-frontbook-fee-launch/`.
   - [x] `prepare!` now also backfills the pricing strategy from the decision path tag when the
         CCAPI payload has none - another Fiserv-only field - and reports `strategy_backfilled`
         so the artifact can show that the strategy was supplied rather than read back
-- [ ] Assert the resolved template name per Run, and stamp the Template ID **and** Version ID the
+- [x] Assert the resolved template name per Run, and stamp the Template ID **and** Version ID the
       render returns onto the Attempt
-- [ ] Assert `preview` is on for every render. If the stack ever becomes `acts_as_prod?`, drafts stop
+  - [x] `LocalCmaRender.call!(account, log_id:, expected_code:)` asserts the resolved template by
+        name **and** by uuid, so neither a missing `needs_consolidated_cma` tag nor a repointed
+        letter config can pass. Backed up and wired into `restore.sh`
+  - [x] Stamps the Template ID, the Version ID and `all_version_uuids` into a `provenance.json`
+        beside the html and pdf, and refuses a log that already holds a document - `render_pdf`
+        returns the stored one and sends no request, so its version id would be a previous
+        render's
+  - [x] Cross-checks the version on `cardmember_agreement_logs.template_version_id` against the
+        one seen on the wire, so a stale column cannot pass for a fresh render
+- [x] Assert `preview` is on for every render. If the stack ever becomes `acts_as_prod?`, drafts stop
       rendering **and** documents start persisting to production
+  - [x] `zzz_local_render_provenance.rb` refuses a CMA render unless **both** `preview` and
+        `allow_unapproved` are on, before the request is sent. `allow_unapproved` was the
+        unguarded one and is the more dangerous: without it TemplateFlow serves the newest
+        approved version, which has no fee variables (FINDINGS #29)
+  - [x] Scoped to the three CMA template uuids - loan contracts render `preview: false`
+        legitimately
+- [x] **Verified end to end on the booted stack 2026-09-02.** Re-rendered `0122` (account 1,
+      log 2): preview and allow_unapproved both true, template `5d5b0b5c-...` consolidated,
+      version `bd8382f5-...`, $30/$41/3% present and no stale $28/$39. Every refusal path
+      exercised too: preview off, allow_unapproved off, wrong strategy, reused log, foreign log.
+      Provenance in `evidence/run-0122/provenance.json`
 
 ### 1.4 The browser walk
 
@@ -141,8 +164,11 @@ Shipped as `.claude/skills/test-frontbook-fee-launch/`.
         summary FX row all present; no stale `$28`/`$39`; the cash-advance `3%` sentence still
         distinct, so the FX check is not a false positive; APR 35.99 as the matrix expects
   - [x] Runbook corrected from what actually happened (FINDINGS #25-28)
-  - [ ] Capture `template_version_uuid` per Attempt - the letter path does not expose it
-        (FINDINGS #28). The Run above records the template uuid only
+  - [x] ~~Capture `template_version_uuid` per Attempt - the letter path does not expose it
+        (FINDINGS #28)~~ **Wrong premise.** It does: `cardmember_agreement_logs` has a
+        `template_version_id` column and the letter writes the response's version to it on every
+        render. The 0122 Run had recorded `bd8382f5-...` all along. FINDINGS #28 corrected;
+        `LocalCmaRender` now reads it back and cross-checks it
   - [ ] Re-walk `0120` (the backbook half of the Pair) for the absence assertions
 
 ### 1.5 MLA forcing

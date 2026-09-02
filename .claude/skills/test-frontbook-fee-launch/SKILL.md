@@ -200,22 +200,38 @@ Three entry points exist. Two fail locally for reasons that never mention the ag
 | `interface.csp_requested_cardmember_agreement_log` | `DataSourceBuildError: annual_membership_fee_amount must be a float`. It regenerates inputs, which need a product decision a locally-approved application does not have |
 | `CardmemberAgreementLetter.render_pdf` on a log with **stored** `template_variables` | **works** |
 
-So:
+Use `LocalCmaRender` (`local-stack/zzz_local_cma_render.rb`) rather than calling the letter
+directly. It performs that render and asserts the three things the output cannot tell you apart:
+which template resolved, which *version* of it TemplateFlow served, and whether the render was a
+non-persisting preview.
 
 ```ruby
-src = cca.cardmember_agreement_logs.issuance.find(<log_id>)
+src = CardmemberAgreementLog.find(<issuance_log_id>)   # the id captured from issue!
 log = CardmemberAgreementLog.create!(
   credit_card_account: cca,
   reason_type: CardmemberAgreementLog::CSP_REQUESTED,
   template_variables: src.template_variables,
 )
-Avant::ServicingV2::Communications::CardmemberAgreementLetter.render_pdf(
-  cardmember_agreement_log: log,
-  template_name: cca.servicing_account.interface.cardmember_agreement_template_name,
-)
-log.reload
-File.write('/usr/src/app/tmp/cma.html', log.document_html.to_s)
+
+prov = LocalCmaRender.call!(cca.id, log_id: log.id, expected_code: "<CODE>",
+                            out_dir: "/usr/src/app/tmp/run-<CODE>")
+puts JSON.pretty_generate(prov)
 ```
+
+It refuses rather than producing weak evidence when:
+
+- the account is not priced at `expected_code`
+- the resolved template is not `credit_card_cardmember_agreement_consolidated`, or that name no
+  longer points at `5d5b0b5c-...` (template 9658)
+- the log already holds a document - `render_pdf` would return the stored one and send no request,
+  so the version id would be a previous render's
+- the version the log records disagrees with the one the render actually used
+- nothing reached TemplateFlow at all
+
+It writes `<base>.html`, `<base>.pdf` and `<base>.provenance.json` into `out_dir` and returns the
+provenance. Copy all three out with `docker cp` into `evidence/run-<CODE>/`.
+
+One render per log. To re-render, create another log from the same `template_variables`.
 
 Do **not** use the CSP "Download CMA" button or the `.eml`. That route pipes `wkhtmltopdf` inside an
 emulated container and hangs. basic already rendered the identical PDF natively.
@@ -226,10 +242,24 @@ emulated container and hangs. basic already rendered the identical PDF natively.
 latest draft. Nothing needs patching: a local stack already renders unapproved drafts in preview
 mode, and preview is what keeps this safe.
 
-**Assert `preview` is actually on** rather than assuming it - see hard rule 3 in `AGENTS.md`. The
-full argument, the code references and the consequences are in
-`docs/adr/0002-render-drafts-against-production-templateflow.md`. Provenance is the
-`template_version_uuid` the render returns; there is no `git_sha_version` yet.
+Two flags do that work, and both default to `!Avant::Env.acts_as_prod?`
+(`avant-basic/lib/avant/templateflow/create_document.rb:18-19`):
+
+| Flag | Off means |
+| --- | --- |
+| `preview` | drafts stop rendering **and** documents start persisting to production |
+| `allow_unapproved` | TemplateFlow serves the newest *approved* version, which has no fee variables and hardcodes `$28`/`$39` (FINDINGS #22) - a frontbook Run then reports backbook amounts and nothing errors |
+
+`zzz_local_render_provenance.rb` refuses a cardmember agreement render unless both are on, before
+the request is sent, so neither can happen silently - hard rule 3 in `AGENTS.md`, and the argument
+is in `docs/adr/0002-render-drafts-against-production-templateflow.md`. It is scoped to the three
+CMA templates: loan contracts render with `preview: false` legitimately.
+
+Provenance is the `template_version_uuid`, and the letter path does persist it - on
+`cardmember_agreement_logs.template_version_id` (FINDINGS #28, since corrected). `LocalCmaRender`
+reads it back and cross-checks it against what the probe saw on the wire. There is no
+`git_sha_version` yet. `all_version_uuids` comes back newest-first, so the version in use is its
+first entry - useful for saying how far ahead of the approved version the draft is.
 
 ## Step 5 - Assert
 
