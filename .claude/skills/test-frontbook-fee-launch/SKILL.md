@@ -1,0 +1,240 @@
+---
+name: test-frontbook-fee-launch
+description: Runs one end-to-end frontbook fee launch validation locally for a given pricing strategy code - sets up the stack from nothing, drives a card application to approval in the browser, issues the card, renders the cardmember agreement, and asserts the fee content. Use when asked to "validate strategy 0122", "test the frontbook fee launch", "run the fee validation for CSRV-5300/5301/5302/5303", or to check that a backbook code still renders $28/$39 with no foreign transaction fee. This is the LLM-driven version: it drives the browser through browser-harness. Not for production - it renders against staging TemplateFlow only.
+---
+
+# Frontbook fee launch validation - one Run
+
+Proves that a card issued under a given pricing strategy renders a cardmember agreement with the
+right fees. Epic CSRV-4119: late fee $28/$39 -> $30/$41, plus a new 3% foreign transaction fee, on
+frontbook codes only.
+
+**You drive this.** Setup is scripted; the browser walk is yours, through browser-harness. A
+deterministic replacement for the browser phase is planned - until then expect this to cost tokens.
+
+## Before anything: the one rule
+
+**Assume silence means failure.** Nearly every failure mode here is silent - a form that will not
+submit and renders no error, a decline with a misleading reason, a mock that never registered, an
+agreement rendered under the wrong strategy. **After every step, assert the state actually changed.**
+A step that did not raise has told you nothing.
+
+Two traps that produce a green run validating the wrong product:
+
+- The canned account stub carries pricing strategy `3007`. Always confirm the strategy you asked for.
+- `AUTOFILL` produces a Miami/FL address with a Chicago ZIP. Overwrite the whole address.
+
+## Step 1 - Set up
+
+```bash
+.claude/skills/test-frontbook-fee-launch/bootstrap.sh
+```
+
+Idempotent; `--verify` checks without changing anything. It installs nothing, but it will clone or
+add worktrees for `avant-basic`, `credit-card-api` and `crm` under `$VALIDATION_ROOT`
+(default `~/Source/avant/frontbook-validation`), restore the local patches, start all three stacks,
+and verify the things that fail silently.
+
+It needs one credential: `AVANT_TEMPLATES_API_KEY`, in `.env.local` at the repo root. It tries to
+read it from the TemplateFlow pod itself:
+
+```bash
+kubectl -n templateflow-asm exec deploy/templateflow-01 -- printenv STAGING_API_KEY
+```
+
+If the user has no cluster access, **ask them for it** - a teammate can send their `.env.local`.
+Take `STAGING_API_KEY`, never `API_KEY`: the latter is the prod legacy key and using it creates the
+prod legacy admin user inside the staging database.
+
+Do not proceed on a failed bootstrap. Every one of its checks exists because something downstream
+fails silently without it.
+
+## Step 2 - Pick the code and its expectations
+
+Ask the user which pricing strategy code, if they did not say. Then read the row from
+`data/run-matrix.csv` - never type expected values from memory.
+
+```bash
+python3 - <<'PY'
+import csv
+CODE = "0122"   # <- the code under test
+for r in csv.DictReader(open("data/run-matrix.csv")):
+    if r["code"] == CODE:
+        print(r)
+PY
+```
+
+The row gives the strategy UUID, the expected late fees, FX fee, RPF, APR cap, annual fees, the
+partner code it replaces, and `reachability`.
+
+`reachability` matters:
+
+- **`direct`** - the code has a UUID and is selectable by URL. 16 of 28.
+- **`mla_forced`** - an MLA variant. It has no UUID by design; it is reached by applying under its
+  non-MLA twin with a local patch forcing a positive TransUnion MLA report. **That patch is not
+  written yet.** If the user asks for an `mla_forced` code, say so and stop rather than running the
+  twin and reporting it as the MLA code.
+
+Confirm the expectations back to the user before spending a browser walk on them.
+
+## Step 3 - Apply, in the browser
+
+Load `scripts/apply_harness.py` into browser-harness. Every workaround in it exists because of an
+observed failure; read its module docstring first.
+
+```
+http://localhost:5001/apply?product_type=credit_card&strategy=<UUID>
+```
+
+An unrecognised UUID redirects to `strategy_param_error_path`. That is a clean, fast failure meaning
+the UUID is not in the param map - not a bug in your walk.
+
+Use a fresh browser context per Run (`new_incognito_tab()`), so one Run's session cannot leak into
+another.
+
+| Stage | What to do |
+| --- | --- |
+| `#/personal` | `AUTOFILL PERSONAL STAGE`; **set last name to `approved`**; fix the phone if the area code starts with `1`; tick consents |
+| `#/personal_continued` | `AUTOFILL`; **overwrite the entire address**; tick consents (an extra IL-specific one appears) |
+| `#/rates_terms` | autofill; **tick `creditHardPullConsent`** |
+| `#/password` | fill both password fields |
+| dashboard `/verify/<app_uuid>` | dev tools -> `Approve Product and Skip Ver`. It is off-canvas at x=2612; use `element.click()`, not a coordinate click |
+| `#/congratulations` | approved |
+
+Five browser traps, all silent, all handled by the harness helpers:
+
+1. Clicks below the fold do nothing - the accessibility box model returns *page* coordinates.
+2. **`scrollIntoView` does not take effect inside the same `js()` eval.** Scroll and measure in
+   separate calls. This is the single most important rule in the harness.
+3. Consent checkboxes are not HTML-`required`, so `checkValidity()` returns true while React refuses
+   to advance.
+4. `AUTOFILL` emits an invalid phone number and an internally inconsistent address.
+5. Dev-tools buttons on the dashboard are off-canvas.
+
+If a stage will not advance and shows no error: blur every input, then re-read the page text. That
+surfaces the block.
+
+**Capture the `application_id` explicitly, now.** Never look it up later by recency - see Step 4.
+
+## Step 4 - Issue and render, in the console
+
+Run against basic:
+
+```bash
+cd "$VALIDATION_ROOT/avant-basic"
+docker compose -p basic-csrv-5300 exec -T web bundle exec rails runner /usr/src/app/tmp/<script>.rb
+```
+
+`rails runner` is not a console: it has no Optimizely client, so **start every script with
+`OptimizelyInitializer.setup!`** or you get `undefined method 'optimizely_client'` from somewhere
+unrelated-looking.
+
+```ruby
+OptimizelyInitializer.setup!
+
+cca = CreditCardAccount.find(<cca_id>)
+cca.issue!                       # => true. Real onboarding, servicing account, agreement log
+LocalCmaStub.prepare!(cca.id)    # fills the Fiserv-only fields
+
+# Sanity, before trusting anything downstream:
+raise "wrong strategy" unless cca.current_cardholder_pricing_strategy_identifier.to_s == "<CODE>"
+```
+
+**Never use `.last` to find the agreement log.** An account accumulates several, and picking the
+wrong one silently validates a different document. Capture the id from `issue!`.
+
+### Rendering: only one path works
+
+Three entry points exist. Two fail locally for reasons that never mention the agreement:
+
+| Path | What happens |
+| --- | --- |
+| `product.send_email!(:credit_card_product_overview, ...)` | 422 `Missing Variables: first_name`. It dies rendering the *email subject*, before the attachment |
+| `interface.csp_requested_cardmember_agreement_log` | `DataSourceBuildError: annual_membership_fee_amount must be a float`. It regenerates inputs, which need a product decision a locally-approved application does not have |
+| `CardmemberAgreementLetter.render_pdf` on a log with **stored** `template_variables` | **works** |
+
+So:
+
+```ruby
+src = cca.cardmember_agreement_logs.issuance.find(<log_id>)
+log = CardmemberAgreementLog.create!(
+  credit_card_account: cca,
+  reason_type: CardmemberAgreementLog::CSP_REQUESTED,
+  template_variables: src.template_variables,
+)
+Avant::ServicingV2::Communications::CardmemberAgreementLetter.render_pdf(
+  cardmember_agreement_log: log,
+  template_name: cca.servicing_account.interface.cardmember_agreement_template_name,
+)
+log.reload
+File.write('/usr/src/app/tmp/cma.html', log.document_html.to_s)
+```
+
+Do **not** use the CSP "Download CMA" button or the `.eml`. That route pipes `wkhtmltopdf` inside an
+emulated container and hangs. basic already rendered the identical PDF natively.
+
+## Step 5 - Assert
+
+Two layers. Run both.
+
+**Layer 1 - the value table.** Compare against the matrix row at five points, each catching a
+different failure:
+
+| Point | Assert | Catches |
+| --- | --- | --- |
+| Confetti | the UUID resolves; fees and APR cap present | stale config, before the Run is wasted |
+| Decisioned application | `expected_max_apr`, annual fee y1/y2 | a missing APR cap, which shows up as 29.99% where you expected 35.99% |
+| Agreement inputs | the three `cma_*` integers | the strategy-to-numbers boundary, with no render needed |
+| Rendered agreement | the five template sites | that the inputs reached the document |
+| CSP late fee label | matches the agreement | that the two cannot disagree |
+
+**Absence is a positive assertion.** For a backbook code the foreign transaction paragraph must
+**not** render and the summary row must read `None`. "I did not find it" is a pass only if you
+looked.
+
+**Layer 2 - the redline.** `data/redline-assertions.json` holds seven assertions derived from the
+L&C-approved document, with fee amounts parameterised. Substitute from the matrix row and compare
+full sentences.
+
+**The `3%` trap:** the only `3%` in a backbook agreement is the cash advance fee - "the greater of
+$10 or 3%". A naive `'3%' in text` check passes for entirely the wrong reason. Match whole
+sentences.
+
+**Compare fee content, never bytes.** `evidence/baseline/cma_0122_local.html` was rendered against a
+different TemplateFlow instance and legitimately differs in unrelated ways.
+
+## Step 6 - Report
+
+Give the user, for the code under test:
+
+- expected vs actual for every assertion, and a verdict
+- the pricing strategy actually resolved, read from
+  `cca.current_cardholder_pricing_strategy_identifier` - the CSP never displays it
+- the TemplateFlow host and the template's `git_sha_version` (or, while it is null, a SHA256 of the
+  template content) - a render with no provenance cannot be attributed to a version
+- the evidence: URLs visited, the console transcript, the rendered agreement
+
+Save the rendered HTML under `evidence/`.
+
+## Known blockers - report these, do not work around them
+
+- **Frontbook codes cannot pass the content assertions yet.** Staging TemplateFlow is not git-backed
+  (`git_sha_version` and `source_file` are both null, last updated 2026-05-20) and its stored content
+  contains none of `cma_late_fee_initial`, `cma_late_fee_subsequent`, `cma_foreign_transaction_fee`.
+  The blocker is **CSRV-5219** (staging sync), not avant-templates#74 merging. **The 14 backbook
+  codes are fully testable today** and are the useful work until that lands.
+- **MLA codes are not runnable** until the local TransUnion MLA patch is written.
+- **No product decision** exists on a locally-approved application, so `cma_apr_margin_decimal` is
+  nil. Fees are unaffected, but do not trust the APR margin on a variable-rate strategy. Do not
+  fabricate a decision to silence it.
+- **CSP may show no Late Fee Structure** depending on the CRM branch. Check
+  `grep -rn lateFeeStructure src/` before reporting its absence as a defect.
+
+## If something breaks
+
+`FINDINGS.md` in the repo root documents 20 failure modes with symptom, cause, and the file and line
+that proves each. Check it before debugging from scratch - most of what goes wrong here has already
+gone wrong once and been written up.
+
+If you hit something genuinely new and it costs more than about fifteen minutes, add it to
+`FINDINGS.md`. That file is why this runbook is short.

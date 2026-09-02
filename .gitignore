@@ -10,3 +10,8 @@ __pycache__/
 
 # Local credentials, never versioned
 .env.local
+
+# The skill is a deliverable of this repo. A global gitignore excludes .claude/,
+# so re-include it: the directory first, then its contents.
+!.claude/
+!.claude/**
