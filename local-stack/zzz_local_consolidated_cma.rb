@@ -1,4 +1,4 @@
-# UNTRACKED local-only initializer (CSRV-5300 validation). See FINDINGS #21.
+# UNTRACKED local-only initializer for the frontbook fee launch validation. See FINDINGS #21.
 #
 # Why this exists
 # ---------------

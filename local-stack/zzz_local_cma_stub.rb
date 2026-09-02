@@ -1,4 +1,4 @@
-# UNTRACKED local-only helper (CSRV-5300 validation). See FINDINGS #15.
+# UNTRACKED local-only helper for the frontbook fee launch validation. See FINDINGS #15.
 #
 # Unblocks CMA generation on a locally-issued card by faking the ONE field Fiserv would have
 # filled in overnight. Everything else is real.

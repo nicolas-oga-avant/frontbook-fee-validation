@@ -1,4 +1,4 @@
-# UNTRACKED local-only initializer (CSRV-5300 validation).
+# UNTRACKED local-only initializer for the frontbook fee launch validation.
 #
 # Why this exists
 # ---------------
@@ -21,7 +21,7 @@
 # ---------------
 # FakeTransunion keys its response off the applicant's LAST NAME:
 #
-#   approved              -> approved report (use this for the CSRV-5300 runs)
+#   approved              -> approved report (use this for the validation runs)
 #   declined              -> declined report
 #   freeze                -> security freeze
 #   initialfcra           -> initial FCRA alert

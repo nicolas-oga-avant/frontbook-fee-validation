@@ -16,7 +16,7 @@ the same call is the pre-scroll one, and the click lands somewhere harmless with
 import json
 
 STRATEGY_UUIDS = {
-    # new frontbook codes (CSRV-5300..5303), from run-matrix.csv
+    # new frontbook codes, from run-matrix.csv
     "0122": "f7ca3250-5403-40f1-9627-8e274349aff7",
     "0123": "991344ab-7889-4333-ae4c-5921b1c30540",
     # old codes, present in both dev and prd Confetti
@@ -289,7 +289,7 @@ def csp_product_details(cc_account_uuid):
     identifier - CSP never displays it, so strategy assignment is inferred from the APR
     plus the accepted apply URL.
 
-    Late Fee Structure is absent unless the CRM checkout contains crm#192 (CSRV-4501);
+    Late Fee Structure is absent unless the CRM checkout contains crm#192;
     check with `grep -rn lateFeeStructure src/` before reading its absence as a defect.
     """
     goto_url("%s/credit_card_accounts/%s/product_details" % (CSP_BASE, cc_account_uuid))
