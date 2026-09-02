@@ -24,7 +24,16 @@ services:
       # Production TemplateFlow. Safe because a local stack is not acts_as_prod?, so
       # create_document defaults preview AND allow_unapproved to true: it renders the
       # latest DRAFT and persists nothing. See docs/adr/0002.
-      AVANT_TEMPLATES_HOST: templateflow.avant.com
+      #
+      # Valueless on purpose, like the key below: a hardcoded host here WINS over
+      # .env.local, so the container would talk to a different TemplateFlow than the one
+      # bootstrap.sh verified - and the check would still pass, because it tests the
+      # shell's host, not the container's.
+      AVANT_TEMPLATES_HOST:
+      # basic type-constrains its CCAPI client config to Strings, so a nil here fails the
+      # onboarding call before any HTTP happens - and `issue!` just returns false. The
+      # value only has to match CCAPI's AUTHORIZATION_SHARED_KEY. See FINDINGS #25.
+      CREDIT_CARD_SHARED_KEY: local-validation-shared-key
       # Deliberately valueless: Compose passes it through from the shell that ran `up`,
       # so the credential never lands in this file, which exists to be copied around.
       # It is a production credential - keep it in .env.local, never here.

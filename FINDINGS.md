@@ -470,6 +470,9 @@ This is **not** an environment problem - a real `rails console` is fine. In a ru
 
 ## 17. Locally-approved applications have no product decision
 
+**Scoped by FINDINGS #27:** true of the dashboard dev-tool approval, not of
+`product.approve!`, after which `generate_cardmember_agreement_inputs` succeeds.
+
 `generate_cardmember_agreement_inputs` logs, on every local run:
 
 ```
@@ -528,6 +531,10 @@ Two consequences:
 Prefer `git_sha_version` once CSRV-5219 lands; record both.
 
 ## 19. Only one of the three CMA render paths works locally
+
+**Amended by FINDINGS #27:** the middle row's failure depends on how the application was
+approved, and the working row needs `template_variables` populated first - the issuance log
+has none.
 
 Three entry points exist. Two fail for unrelated reasons, and neither failure mentions the CMA:
 
@@ -699,3 +706,96 @@ Two useful facts when clearing the way:
 - The `avant_basic_shared_bundle` volume is declared without `external: true`, so compose warns that
   it "already exists but was created for project csrv-4925". Harmless - the bundle is shared on
   purpose - but it makes every first `up` look like it is doing something wrong.
+
+## 25. `issue!` returns false with no error when `CREDIT_CARD_SHARED_KEY` is unset
+
+The first real local issuance returned `false` from `cca.issue!` - no exception, `errors` empty,
+`can_issue?` true. The reason is stored **encrypted** on `card_onboarding_calls`, which is the only
+place it appears:
+
+```ruby
+CardOnboardingCall.where(customer_application_uuid: "<uuid>").order(:id).last.response
+#=> outcome=:error value="value returned (Some({... :shared_key=>nil})) does not meet type
+#   constraints: ... shared_key: Constrained<Nominal<String> rule=[type?(String)]>"
+```
+
+basic type-constrains its CCAPI client config to Strings, so a nil `CREDIT_CARD_SHARED_KEY`
+(`lib/avant/env.rb:1569`) fails the contract **before any HTTP request is made** - which is why
+nothing appears in the CCAPI logs and why the failure looks like a silent state-machine refusal.
+
+CCAPI reads the matching value from `AUTHORIZATION_SHARED_KEY` (`credit-card-api/lib/env.rb:191`),
+and both were unset. Fixed by setting them to the same value in the two compose overrides. Read the
+onboarding call's `response` before investigating anything else when `issue!` returns false.
+
+## 26. The local stack has no customer dashboard, so the runbook's approval step does not exist
+
+After `CREATE PASSWORD` the local apply flow redirects to
+`https://avant.staging-app.avant-test.com/verify/<app_uuid>` - `IP_DASH_URL` in avant-basic's
+tracked `.env.development`. The dashboard is the separate **customer-dashboard** app, which this
+stack does not run, and `http://localhost:5001/verify/<uuid>` is a 404.
+
+So the `dev tools -> Approve Product and Skip Ver` step in the runbook cannot be performed against a
+local stack. That button calls `Avant::GraphQL::DevTools::Mutations::ApproveProduct` at
+`/customer_dev_tools_graphql`, and **that endpoint is broken on `main`**
+(`app/controllers/graph_controller.rb:47-51`):
+
+```ruby
+return render status: 404 unless Avant::Env.debug_graphql?
+return render status: 404 if variables['customer_id'].blank?   # reads `variables`...
+variables = params[:variables]&.to_unsafe_h || {}              # ...assigned only here
+```
+
+Ruby treats `variables` as a local from the assignment onward, so the earlier read raises
+`NameError: undefined local variable or method 'variables'`. With `debug_graphql?` true the endpoint
+500s on every request; with it false it 404s. It cannot work either way. Worth its own defect ticket.
+
+**What to do instead:** approve server-side, which is what the mutation's non-G2 branch does anyway:
+
+```ruby
+app = CustomerApplication.find_by!(uuid: "<app_uuid>")
+app.product.approve!   # on_g2? == false locally
+```
+
+## 27. The issuance agreement log carries no `template_variables`
+
+`cca.issue!` creates a `CardmemberAgreementLog` with `reason_type: "issuance"` and
+**`template_variables: nil`**, so `CardmemberAgreementLetter.render_pdf` on it renders nothing.
+
+Two corrections to earlier findings:
+
+- **`generate_cardmember_agreement_inputs` works.** FINDINGS #17 and #19 record it failing with
+  `annual_membership_fee_amount must be a float`. That is true of an application approved through the
+  dashboard dev tool, which leaves no product decision - **not** of one approved with
+  `product.approve!`, which does. After a real approval it returns 30 keys including
+  `late_fee_initial`, `late_fee_subsequent` and `foreign_transaction_fee`.
+- **Those inputs are not the whole variable set.** Rendering them directly through
+  `Avant::Templateflow::CreateDocument` gets a 422:
+  `Missing Variables: account_upc2, address_city_state_and_zip, address_full_street,
+  card_credit_limit, card_rpf_eligible, card_rpf_maximum_fee_amount, cma_fixed_rate, first_name,
+  last_name, ...` - the customer PII, credit limit and RPF flags that the *letter* pipeline merges in.
+
+So the working sequence is: generate the inputs, store them on the log, then render **through
+`CardmemberAgreementLetter`**, which supplies the letter data:
+
+```ruby
+log.update!(template_variables: cca.generate_cardmember_agreement_inputs)
+Avant::ServicingV2::Communications::CardmemberAgreementLetter.render_pdf(
+  cardmember_agreement_log: log,
+  template_name: :credit_card_cardmember_agreement_consolidated,
+)
+```
+
+Note `Avant::Templateflow::CreateDocument.call` returns a Verbalize result whose `.value` **raises**
+on failure with a message about using `call!`. Use `call!` in a `begin/rescue`, or the real 422 stays
+hidden behind a misleading `Verbalize::Failure` error.
+
+## 28. The letter render path does not expose `template_version_uuid`
+
+ADR 0002 makes the version uuid the provenance for every Attempt, but nothing on the letter path
+persists it: `CardmemberAgreementLog` has no `template_version_uuid` column, and
+`RenderFromTemplate` only forwards it to a logger behind `should_log?`.
+
+`Avant::Templateflow::CreateDocument.call!` **does** return it in the response body. So a Run that
+needs provenance has to either call `CreateDocument` itself with the full merged variable set, or
+capture the response inside the letter path. Recording the template uuid alone is not enough - see
+FINDINGS #22 for why a version, not a template, is what identifies the content under test.

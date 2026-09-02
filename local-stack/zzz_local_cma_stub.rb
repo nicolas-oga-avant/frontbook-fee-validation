@@ -75,6 +75,7 @@ module LocalCmaStub
       payload = cca.account.to_h.deep_stringify_keys
       payload[ONBOARDING_MARKER] = Date.current.to_s
       backfill_rates!(cca, payload)
+      backfilled_strategy = backfill_strategy!(cca, payload)
 
       cross_check_strategy!(cca, payload)
 
@@ -93,7 +94,7 @@ module LocalCmaStub
       # account renders _1 and reports $28/$39 for any pricing strategy.
       cca.add_scenario!(::CreditCardAccount::Scenarios::NEEDS_CONSOLIDATED_CMA)
 
-      verify!(cca)
+      verify!(cca).merge(strategy_backfilled: backfilled_strategy)
     end
 
     def revert!(account)
@@ -156,6 +157,28 @@ module LocalCmaStub
       set_if_unset(payload, 'cash_advance_daily_rate',    cash && (cash / 365))
       set_if_unset(payload, 'credit_limit_cents',      cca.credit_line_amount_cents&.to_i)
       payload
+    end
+
+    # The pricing strategy is another field only Fiserv's overnight processing writes, so a
+    # locally issued account carries none and the cross-check below has nothing to compare.
+    # Fill it from the decision path tag - the record of what real decisioning actually priced
+    # the application at - the same way backfill_rates! fills the rate fields from basic's own
+    # decisioned columns.
+    #
+    # Returns whether it had to, so the caller can say so: a Run whose strategy was supplied
+    # rather than read back from the account is weaker evidence, and the artifact must show it.
+    def backfill_strategy!(cca, payload)
+      return false if payload[STRATEGY_FIELD].present?
+
+      expected = decisioned_pricing_strategy(cca)
+      if expected.blank?
+        raise Error, 'account payload carries no pricing strategy and the application has no ' \
+                     'avant_card_initial_strategy decision path tag either, so there is nothing ' \
+                     'to price the agreement from. Was the application decisioned?'
+      end
+
+      payload[STRATEGY_FIELD] = expected
+      true
     end
 
     def set_if_unset(payload, key, value)

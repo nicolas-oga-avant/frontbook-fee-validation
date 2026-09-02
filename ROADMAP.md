@@ -115,9 +115,12 @@ Shipped as `.claude/skills/test-frontbook-fee-launch/`.
   - [x] Verified on the booted stack 2026-09-02: the prepend sits ahead of `CreditCardAccount`,
         an untagged account reads false, a tagged one flips both `scenario_enabled?` and
         `consolidated_cma_enabled?` to true, and `consolidated_cma_cutoff_date` is confirmed `nil`
-  - [ ] Still unproven end to end: that a tagged, *issued* account resolves
-        `cardmember_agreement_template_name` to the consolidated template, and that the render
-        picks up the v7 draft. Both need a real Run (1.4)
+  - [x] Proven end to end on account 1: `cma_template` resolves to
+        `:credit_card_cardmember_agreement_consolidated`, `show_consolidated_cma` is true, and the
+        render picked up the v7 draft content
+  - [x] `prepare!` now also backfills the pricing strategy from the decision path tag when the
+        CCAPI payload has none - another Fiserv-only field - and reports `strategy_backfilled`
+        so the artifact can show that the strategy was supplied rather than read back
 - [ ] Assert the resolved template name per Run, and stamp the Template ID **and** Version ID the
       render returns onto the Attempt
 - [ ] Assert `preview` is on for every render. If the stack ever becomes `acts_as_prod?`, drafts stop
@@ -126,9 +129,21 @@ Shipped as `.claude/skills/test-frontbook-fee-launch/`.
 ### 1.4 The browser walk
 
 - [x] `scripts/apply_harness.py` carries the five silent browser traps as working helpers
-- [ ] Point `APPLY_URL` at the local stack - it still targets `dev.avant.com`
-- [ ] Extend `STRATEGY_UUIDS` beyond the four codes it holds, or read `data/run-matrix.csv` directly
-- [ ] Walk one Run end to end through the skill, and correct the runbook from what actually happens
+- [x] `APPLY_URL` replaced by `apply_url(code)` off `APPLY_BASE`, local by default and
+      env-overridable. The local flow accepts the strategy param and reaches `#/personal`
+- [x] `STRATEGY_UUIDS` replaced by `load_run_matrix()` / `strategy_uuids()` reading
+      `data/run-matrix.csv` - all 16 URL-reachable codes, and MLA codes now raise with the base
+      code to apply under instead of building a URL with `strategy=None`
+- [x] **Walked `0122` end to end 2026-09-02. All fee assertions PASS.** Application 6 -> account 1,
+      decisioned under `0122`, issued with a real Fiserv customer reference, rendered against the
+      production v7 draft in preview mode. Evidence in `evidence/run-0122/`
+  - [x] `$30` / `$41` late fee sentence, 3% FX paragraph, conversion-rate-costs clause, and the
+        summary FX row all present; no stale `$28`/`$39`; the cash-advance `3%` sentence still
+        distinct, so the FX check is not a false positive; APR 35.99 as the matrix expects
+  - [x] Runbook corrected from what actually happened (FINDINGS #25-28)
+  - [ ] Capture `template_version_uuid` per Attempt - the letter path does not expose it
+        (FINDINGS #28). The Run above records the template uuid only
+  - [ ] Re-walk `0120` (the backbook half of the Pair) for the absence assertions
 
 ### 1.5 MLA forcing
 

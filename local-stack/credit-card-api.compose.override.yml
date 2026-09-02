@@ -14,6 +14,8 @@ services:
 
   web: &ccapi-env
     environment:
+      # Matches basic's CREDIT_CARD_SHARED_KEY; basic sends it as X-Avant-Authorization.
+      AUTHORIZATION_SHARED_KEY: local-validation-shared-key
       # Point CCAPI at LOCAL basic. Dev CCAPI's Vault value is
       # https://basic-mp.ocala... which is the wrong database for a customer created
       # against local basic. Container -> host, so host.docker.internal, not localhost.

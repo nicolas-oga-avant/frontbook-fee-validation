@@ -23,9 +23,33 @@ import os
 APPLY_BASE = os.environ.get("APPLY_BASE", "http://localhost:5001")
 CSP_BASE = os.environ.get("CSP_BASE", "http://localhost:4000/us")
 
-_MATRIX_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), os.pardir, "data", "run-matrix.csv"
-)
+_MATRIX_REL = os.path.join("data", "run-matrix.csv")
+
+
+def _matrix_path():
+    """Locate run-matrix.csv without relying on __file__.
+
+    This module is exec'd by browser-harness from concatenated source, so __file__ points at
+    the harness package rather than here - a __file__-relative path resolves into
+    site-packages and raises FileNotFoundError. Search from RUN_MATRIX, then upward from the
+    working directory.
+    """
+    override = os.environ.get("RUN_MATRIX")
+    if override:
+        return override
+
+    here = os.path.abspath(os.curdir)
+    while True:
+        candidate = os.path.join(here, _MATRIX_REL)
+        if os.path.exists(candidate):
+            return candidate
+        parent = os.path.dirname(here)
+        if parent == here:
+            raise FileNotFoundError(
+                "could not find %s above %s - run from the validation repo, or set "
+                "RUN_MATRIX to its path" % (_MATRIX_REL, os.path.abspath(os.curdir))
+            )
+        here = parent
 
 
 def load_run_matrix(path=None):
@@ -34,7 +58,7 @@ def load_run_matrix(path=None):
     Read rather than duplicated: an expected fee amount that disagrees between the CSV and a
     copy in here would be a wrong PASS, not a crash.
     """
-    with open(path or _MATRIX_PATH, newline="") as fh:
+    with open(path or _matrix_path(), newline="") as fh:
         return [row for row in csv.DictReader(fh) if row.get("code")]
 
 
