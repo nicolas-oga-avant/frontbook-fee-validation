@@ -20,7 +20,7 @@ It runs with no parameters. A bare invocation means "advance the Manifest".
 | If you are... | Read |
 | --- | --- |
 | An agent about to touch anything | **`AGENTS.md`** - rules of engagement, non-negotiable |
-| Picking up the build | `TODO.md`, then `DESIGN.md` |
+| Picking up the build | `ROADMAP.md`, then `DESIGN.md` |
 | Setting up a machine | `SETUP.md` |
 | Running or debugging one test | `PROCEDURE.md`, then `FINDINGS.md` |
 | Confused by a word | `CONTEXT.md` |
@@ -30,12 +30,12 @@ It runs with no parameters. A bare invocation means "advance the Manifest".
 
 ```
 AGENTS.md      rules of engagement - read first
+ROADMAP.md     the objective, the two phases, and the checklist
 DESIGN.md      what the skill is and why it is shaped this way
 SETUP.md       replicable environment setup
 PROCEDURE.md   the steps of one Run
-FINDINGS.md    17 platform findings - every failure mode, with evidence
+FINDINGS.md    20 platform findings - every failure mode, with evidence
 CONTEXT.md     glossary
-TODO.md        implementation checklist, ticked as work completes
 
 data/          run-matrix.csv (28 Runs, expected values, UUIDs), redline assertions, source sheet
 scripts/       apply_harness.py, extract_redline_assertions.py

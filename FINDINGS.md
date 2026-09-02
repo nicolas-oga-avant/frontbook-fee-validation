@@ -59,7 +59,7 @@ are near-empty - `group_9xxx.rb` is entirely commented out - and are **not** the
 > **UPDATE 2026-09-01: superseded in part.** The diagnosis below is correct, but the conclusion
 > "cannot be tested" is not. The minimal fix at the bottom of this finding is applied locally as
 > `zzz_local_mla_stub.rb`, so all 28 Runs are reachable. See `DESIGN.md` decision 7 for the
-> constraints on that patch. The underlying defect in `avant-basic` is still unowned - see `TODO.md`.
+> constraints on that patch. The underlying defect in `avant-basic` is still unowned - see `ROADMAP.md`.
 
 
 The 12 MLA codes have no UUID and are never URL-selectable. They are derived at onboarding:

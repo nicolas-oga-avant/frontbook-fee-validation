@@ -47,7 +47,7 @@ file and line that proves it. Number it and reference the number from failure me
 
 ## Ticking off work
 
-`TODO.md` is the implementation checklist. Tick items as you complete them, in the same commit or
+`ROADMAP.md` carries the objective and the checklist. Tick items as you complete them, in the same commit or
 edit as the work itself. Do not tick an item you have not verified end to end. If an item turns out
 to be wrong, strike it and say why rather than silently deleting it.
 
@@ -60,5 +60,5 @@ to be wrong, strike it and say why rather than silently deleting it.
 | How do I get the stack running? | `SETUP.md` |
 | What are the steps of one Run? | `PROCEDURE.md` |
 | What is broken/surprising about this platform? | `FINDINGS.md` |
-| What is left to do? | `TODO.md` |
+| What is the goal, and what is left? | `ROADMAP.md` |
 | Why was this decided? | `docs/adr/` |
