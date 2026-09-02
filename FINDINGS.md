@@ -637,3 +637,65 @@ Two traps follow:
    `GET /api/v1/templates/<uuid>` hashes the *approved* version, so the hash does not move when the
    draft is edited - which is the only thing that changes during this campaign. Derive the Epoch
    from the `template_version_uuid` the render returns instead; that is the version actually used.
+
+## 23. `restore.sh` silently failed to exclude patches in a git WORKTREE
+
+Found 2026-09-02 on the first real `bootstrap.sh` run. `restore.sh` reported:
+
+```
+avant-basic: 1 tracked-visible override files (expect 0)
+```
+
+and carried on. The visible file was `config/initializers/zzz_local_consolidated_cma.rb`, sitting as
+`??` in `git status` inside a checkout shared with other agent sessions - one `git add .` from being
+committed, which hard rule 4 exists to prevent.
+
+Cause: `restore()` looked for the exclude file at `$repo/.git/info/exclude` behind an `[ -f "$ex" ]`
+test. `bootstrap.sh` creates **worktrees**, and in a worktree `.git` is a *file* pointing at the main
+clone, so that path does not exist and the test skipped the append without a word:
+
+```
+$ ls -ld .git
+-rw-r--r--  1 ichigolas  staff  77 .git
+$ test -f .git/info/exclude && echo exists || echo MISSING
+MISSING
+$ git rev-parse --path-format=absolute --git-common-dir
+/Users/ichigolas/Source/avant/avant-basic/.git
+```
+
+The three older patches looked fine only by luck: the main clone's exclude already listed them from
+earlier manual work in `~/Source/avant/avant-basic`, and worktrees share `info/exclude` with the
+common dir. Any *new* patch would have been exposed the same way.
+
+Fixed by resolving the path through `git rev-parse --path-format=absolute --git-common-dir`, which is
+correct for both a plain clone and a worktree, and by making the verification **exit 1** instead of
+printing a mismatch and continuing. Printing "expect 0" next to a 1 and proceeding is the exact
+silence-means-failure pattern this project is built to avoid.
+
+## 24. Renaming the compose project does not isolate two stacks - the host ports collide
+
+The compose projects are now named after this workdir rather than a ticket. That gives each stack its
+own containers, network and volumes, but **not** its own host ports: `basic` binds 5001, ccapi 7100,
+CRM 4000 in the override files, so a second stack dies at
+
+```
+Bind for 0.0.0.0:5001 failed: port is already allocated
+```
+
+after its db, redis, minio and sidekiq have already started - leaving a half-up stack behind that
+needs `down` before a retry.
+
+So only one validation stack runs at a time on a machine, whatever it is called. `bootstrap.sh`'s
+pre-flight guard catches the same-project case by inspecting the running container's
+`working_dir` label, but not this one, because a differently-named project is invisible to it.
+
+Two useful facts when clearing the way:
+
+- **`docker compose down` keeps named volumes; only `down -v` destroys them.** Volume names are
+  keyed to the *project* name, not the working directory, so stopping a stack and bringing it back up
+  under the same project name returns the same database - issued accounts, agreement logs and all.
+  The old `basic-csrv-5300_ab_postgres16_data` still holds account 5211958 and the 37 agreement logs
+  the earlier findings cite.
+- The `avant_basic_shared_bundle` volume is declared without `external: true`, so compose warns that
+  it "already exists but was created for project csrv-4925". Harmless - the bundle is shared on
+  purpose - but it makes every first `up` look like it is doing something wrong.

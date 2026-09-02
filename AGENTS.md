@@ -125,7 +125,7 @@ AGENTS.md      this file - entry point and rules (README.md, CLAUDE.md are symli
 ROADMAP.md     the objective, the two phases, dependency state, and the checklist
 DESIGN.md      what the skill is and why it is shaped this way
 SETUP.md       replicable environment setup, the services involved, and the traps
-FINDINGS.md    22 platform findings - every failure mode, with evidence
+FINDINGS.md    24 platform findings - every failure mode, with evidence
 CONTEXT.md     glossary
 
 .claude/skills/test-frontbook-fee-launch/

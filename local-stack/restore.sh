@@ -39,10 +39,19 @@ restore() {  # $1=source in this dir  $2=repo  $3=path within the repo
   mkdir -p "$(dirname "$repo/$rel")"
   cp "$src" "$repo/$rel"
   # Never let these get committed: the checkouts are shared with other agent sessions.
-  local ex="$repo/.git/info/exclude"
-  if [ -f "$ex" ] && ! grep -qxF "$rel" "$ex"; then
-    echo "$rel" >> "$ex"
+  #
+  # Resolve the exclude file through git rather than assuming $repo/.git is a directory. In a
+  # WORKTREE it is a file pointing at the main clone, so the naive path does not exist and an
+  # existence test silently skips the exclude - leaving the patch showing as untracked in a
+  # shared repo, one `git add .` from being committed.
+  local common; common="$(git -C "$repo" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+  if [ -z "$common" ]; then
+    echo "FATAL: $2 at $repo is not a git repository - cannot exclude $rel" >&2
+    exit 1
   fi
+  local ex="$common/info/exclude"
+  mkdir -p "$(dirname "$ex")"
+  grep -qxF "$rel" "$ex" 2>/dev/null || echo "$rel" >> "$ex"
   echo "  ok    $2/$rel"
 }
 
@@ -56,11 +65,20 @@ restore crm.docker-compose.override.yml          crm             docker-compose.
 
 echo
 echo "Verifying nothing became git-visible:"
+visible=0
 for r in avant-basic credit-card-api crm; do
   [ -d "$ROOT/$r" ] || continue
   n="$(cd "$ROOT/$r" && git status --porcelain 2>/dev/null | grep -cE 'override\.yml|zzz_local_' || true)"
   echo "  $r: $n tracked-visible override files (expect 0)"
+  [ "$n" -eq 0 ] || { visible=$((visible + n)); (cd "$ROOT/$r" && git status --porcelain | grep -E 'override\.yml|zzz_local_' | sed 's/^/      /'); }
 done
+# Printing the mismatch and carrying on is how a patch ends up in a shared repo's history.
+if [ "$visible" -ne 0 ]; then
+  echo "FATAL: $visible override file(s) are visible to git in a SHARED checkout." >&2
+  echo "  They should be in \$(git rev-parse --git-common-dir)/info/exclude. Re-run this" >&2
+  echo "  script - it repairs the exclude entries - and never 'git add' them." >&2
+  exit 1
+fi
 
 if [ "${1:-}" = "--up" ]; then
   # A missing key does not fail here - it fails as a 401 at render time, long after
