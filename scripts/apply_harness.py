@@ -1,7 +1,7 @@
 """browser-harness helpers for driving a card application to an approved account.
 
 Executed end to end on 2026-08-31 for strategy 0122. Every workaround here exists because
-of a failure actually observed; see RUN-1-WALKTHROUGH.md for the symptom each one fixes.
+of a failure actually observed; FINDINGS.md carries the symptom each one fixes.
 
 Not standalone - run it inside browser-harness, which pre-imports js, cdp, click_at_xy,
 page_info, goto_url, wait, wait_for_load, switch_tab, press_key:
@@ -13,19 +13,59 @@ scrollIntoView does not take effect within the eval that calls it, so a rect mea
 the same call is the pre-scroll one, and the click lands somewhere harmless with no error.
 """
 
+import csv
 import json
+import os
 
-STRATEGY_UUIDS = {
-    # new frontbook codes, from run-matrix.csv
-    "0122": "f7ca3250-5403-40f1-9627-8e274349aff7",
-    "0123": "991344ab-7889-4333-ae4c-5921b1c30540",
-    # old codes, present in both dev and prd Confetti
-    "0120": "173b1fb8-525e-488e-9353-63df8b253542",
-    "0121": "380c7a04-b4b8-4d65-8218-7c7b133eb213",
-}
+# The stack this drives. Local by default: dev/Ocala can walk the apply flow but cannot issue
+# a card, so local is the only environment where the chain closes. Override to point at
+# another stack without editing this file.
+APPLY_BASE = os.environ.get("APPLY_BASE", "http://localhost:5001")
+CSP_BASE = os.environ.get("CSP_BASE", "http://localhost:4000/us")
 
-APPLY_URL = "https://www.dev.avant.com/apply?product_type=credit_card&strategy=%s"
-CSP_BASE = "http://localhost:4000/us"
+_MATRIX_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), os.pardir, "data", "run-matrix.csv"
+)
+
+
+def load_run_matrix(path=None):
+    """The 28 Runs as a list of dict rows, straight from run-matrix.csv.
+
+    Read rather than duplicated: an expected fee amount that disagrees between the CSV and a
+    copy in here would be a wrong PASS, not a crash.
+    """
+    with open(path or _MATRIX_PATH, newline="") as fh:
+        return [row for row in csv.DictReader(fh) if row.get("code")]
+
+
+def strategy_uuids(matrix=None):
+    """code -> Confetti strategy uuid, for the codes reachable by apply URL.
+
+    MLA codes are absent by design: they carry no uuid of their own and are reached by
+    applying under `mla_base_code` as an MLA-flagged applicant, so a caller that finds a
+    code missing here needs the MLA path, not a lookup fix.
+    """
+    rows = load_run_matrix() if matrix is None else matrix
+    return {r["code"]: r["uuid"] for r in rows if r.get("uuid")}
+
+
+def apply_url(code, matrix=None):
+    """The apply URL for one pricing strategy code.
+
+    Raises on a code with no uuid rather than building a URL with `strategy=None`, which the
+    flow accepts and then silently prices under the default strategy.
+    """
+    uuids = strategy_uuids(matrix)
+    if code not in uuids:
+        rows = {r["code"]: r for r in (load_run_matrix() if matrix is None else matrix)}
+        row = rows.get(code)
+        if row and row.get("mla_base_code"):
+            raise ValueError(
+                "%s is an MLA variant with no strategy uuid: apply under base code %s as an "
+                "MLA-flagged applicant instead" % (code, row["mla_base_code"])
+            )
+        raise ValueError("no strategy uuid for code %r in run-matrix.csv" % code)
+    return "%s/apply?product_type=credit_card&strategy=%s" % (APPLY_BASE, uuids[code])
 
 
 # --- browser context -------------------------------------------------------------------
