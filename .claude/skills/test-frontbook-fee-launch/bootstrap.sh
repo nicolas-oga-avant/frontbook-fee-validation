@@ -179,6 +179,18 @@ tf="$(cd "$VALIDATION_ROOT/avant-basic" && docker compose -p basic-frontbook-fee
   Never --force-recreate CRM: it wipes the client bundle."
 ok "TemplateFlow key reached the container"
 
+# An initializer that exists on disk has told you nothing about whether it RAN. Both of these
+# log a [local] line at boot; assert on the log, not the file. Note the destination: Rails logs
+# to log/development.log INSIDE the container, so `docker compose logs` shows none of this.
+for want in 'LocalConsolidatedCma active' 'FakeTransunion mock registered'; do
+  (cd "$VALIDATION_ROOT/avant-basic" && docker compose -p basic-frontbook-fee-validation exec -T web \
+    sh -c 'grep -h "\[local\]" log/development.log 2>/dev/null' 2>/dev/null) | grep -qF "$want" \
+    || die "no '[local] $want' in log/development.log.
+  The initializer did not run, so the behaviour it provides is silently absent. Check that
+  local-stack/restore.sh put it in config/initializers/ and that the container was recreated."
+  ok "boot log: $want"
+done
+
 http="$(curl -s -o /dev/null -m 25 -w '%{http_code}' \
   -H "Api-Key: $AVANT_TEMPLATES_API_KEY" "https://$AVANT_TEMPLATES_HOST/api/v1/templates" || true)"
 [ "$http" = "200" ] || die "TemplateFlow returned $http for the templates list.

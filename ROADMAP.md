@@ -72,9 +72,14 @@ Shipped as `.claude/skills/test-frontbook-fee-launch/`.
       doing any checkout work
 - [x] Verifies the silent failures: mock env vars, the key reaching the container, TemplateFlow
       accepting it
-- [ ] **Run `bootstrap.sh` end to end on a clean machine.** Only the `--verify` path has been
-      exercised; the clone-and-start path has not
-- [ ] Confirm the `zzz_local_*` initializers load **from the boot log**, not merely exist on disk
+- [x] **Ran `bootstrap.sh` end to end 2026-09-02, exit 0** - fresh worktrees, a from-scratch CRM
+      image build, the DB dump restore, and every silent-failure check green. `--verify` also 0
+  - [ ] The `git clone` branch is still unexercised: all three repos already existed locally, so
+        the run took the worktree path. Only a machine without the clones tests the other half
+- [x] Confirmed the `zzz_local_*` initializers load **from the boot log** - both `[local]` lines
+      appear under the unicorn pid. They go to `log/development.log` **inside the container**, not
+      to `docker compose logs`, which is why the obvious check comes up empty. Now asserted by
+      `bootstrap.sh` so it cannot regress silently
 
 ### 1.2 Credentials
 
@@ -82,7 +87,9 @@ Shipped as `.claude/skills/test-frontbook-fee-launch/`.
 - [x] `restore.sh` sources it before resolving `AVANT_ROOT`
 - [x] The override declares `AVANT_TEMPLATES_API_KEY` valueless, so Compose passes it through and it
       never lands in a copied file
-- [ ] Swap in a **production** TemplateFlow key - `.env.local` still holds the Ocala staging one
+- [x] Production TemplateFlow key in place 2026-09-02 (`templateflow.boston.k8s.prd.app.avant.com`),
+      accepted with 200 on the templates list and reaching the container
+- [x] `.env.local` arrived world-readable; chmod 600 applied. It is a production credential
 
 ### 1.3 The render path
 
@@ -105,9 +112,12 @@ Shipped as `.claude/skills/test-frontbook-fee-launch/`.
         `show_consolidated_cma?`
   - [x] `verify!` refuses to return unless the resolved template is the consolidated one, naming
         the boot-log line to check when it is not
-  - [ ] **Not yet run against a booted stack.** Syntax-checked only; `to_prepare` prepend ordering,
-        `add_scenario!` and the `show_consolidated_cma?` flip are all unverified until 1.1's clean
-        bootstrap run happens
+  - [x] Verified on the booted stack 2026-09-02: the prepend sits ahead of `CreditCardAccount`,
+        an untagged account reads false, a tagged one flips both `scenario_enabled?` and
+        `consolidated_cma_enabled?` to true, and `consolidated_cma_cutoff_date` is confirmed `nil`
+  - [ ] Still unproven end to end: that a tagged, *issued* account resolves
+        `cardmember_agreement_template_name` to the consolidated template, and that the render
+        picks up the v7 draft. Both need a real Run (1.4)
 - [ ] Assert the resolved template name per Run, and stamp the Template ID **and** Version ID the
       render returns onto the Attempt
 - [ ] Assert `preview` is on for every render. If the stack ever becomes `acts_as_prod?`, drafts stop
