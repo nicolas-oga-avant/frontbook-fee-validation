@@ -472,3 +472,165 @@ def cma_pdf_url(cc_account_uuid):
     returns a body. The CMA is not generated at approval time. See RUN-1-WALKTHROUGH.md.
     """
     return "%s/api/cardMemberAgreements/%s/cma.pdf" % (CSP_BASE, cc_account_uuid)
+
+
+# --- application-time surfaces -----------------------------------------------------------
+
+# The Schumer box surfaces are served by different apps and can point at different stacks:
+# avant-basic's own page and the account-opening flow come from whatever APPLY_BASE is, while
+# the landing page is Contentful-backed and lives on the marketing site. Each is overridable
+# so a Run can be walked against dev-mp without editing this file.
+SCHUMER_BASE = os.environ.get("SCHUMER_BASE", APPLY_BASE)
+LANDING_BASE = os.environ.get("LANDING_BASE", APPLY_BASE)
+
+# Surfaces that do not exist yet. Their tickets have to deploy before a capture means
+# anything; until then a Run captures them anyway, so the flip is evidenced by a before and an
+# after rather than asserted from a single post-deploy state.
+BLOCKED_SURFACES = {
+    "schumer_account_opening": "CAF account-opening disclosure and the react_index_url bump",
+    "schumer_landing": "the avant-redesign disclosure and the Contentful landing pages",
+}
+
+
+def surface_urls(code, matrix=None):
+    """The application-time surfaces for one code: surface -> url, or None with a reason.
+
+    An MLA code reaches none of them. It has no strategy uuid, and all three surfaces are
+    addressed by uuid (FINDINGS #8), so its application-time evidence is predecisioned_terms
+    plus the agreement - which is what the ticket asks for, not a shortcut.
+    """
+    rows = {r["code"]: r for r in (load_run_matrix() if matrix is None else matrix)}
+    row = rows.get(code)
+    if row is None:
+        raise ValueError("no row for code %r in run-matrix.csv" % code)
+
+    uuid = row.get("uuid")
+    if not uuid:
+        reason = ("%s is an MLA variant with no strategy uuid: no Schumer box surface is "
+                  "addressable for it" % code)
+        return {name: (None, reason) for name in
+                ("schumer_basic", "schumer_account_opening", "schumer_landing")}
+
+    return {
+        "schumer_basic": ("%s/schumer_box/%s" % (SCHUMER_BASE, uuid), None),
+        "schumer_account_opening": (
+            "%s/apply?product_type=credit_card&strategy=%s" % (APPLY_BASE, uuid),
+            BLOCKED_SURFACES["schumer_account_opening"]),
+        "schumer_landing": ("%s/credit-card/landing/schumer/%s" % (LANDING_BASE, uuid),
+                            BLOCKED_SURFACES["schumer_landing"]),
+    }
+
+
+def evidence_dir(code, root=None):
+    """`evidence/run-<code>/`, created. Beside the html and pdf the render writes."""
+    base = root or os.path.dirname(os.path.dirname(os.path.abspath(_matrix_path())))
+    path = os.path.join(base, "evidence", "run-%s" % code)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _unclip_ancestors(selector):
+    """Expand every scrolling ancestor of `selector` so the whole element is renderable.
+
+    The account-opening Schumer box lives in a 240px scroll window over a 740px table, so a
+    plain screenshot captures the interest-rate rows and clips off the fee rows - which are
+    the ones this campaign is about. Returns a token to pass to _reclip().
+    """
+    return js("""
+    (() => {
+      const el = document.querySelector(%s);
+      if (!el) return 'not found';
+      const saved = [];
+      for (let e = el.parentElement; e && e !== document.documentElement; e = e.parentElement) {
+        if (e.scrollHeight > e.clientHeight + 1) {
+          saved.push([e, e.style.height, e.style.maxHeight, e.style.overflow]);
+          e.style.height = e.scrollHeight + 'px';
+          e.style.maxHeight = 'none';
+          e.style.overflow = 'visible';
+        }
+      }
+      window.__bhUnclipped = saved;
+      return 'unclipped ' + saved.length;
+    })()
+    """ % json.dumps(selector))
+
+
+def _reclip():
+    return js("""
+    (() => {
+      const saved = window.__bhUnclipped || [];
+      saved.forEach(([e, h, m, o]) => { e.style.height = h; e.style.maxHeight = m; e.style.overflow = o; });
+      window.__bhUnclipped = null;
+      return 'restored ' + saved.length;
+    })()
+    """)
+
+
+def _element_rect(selector):
+    """The element's box in page coordinates, which is what Page.captureScreenshot clips in."""
+    return json.loads(js("""
+    (() => {
+      const el = document.querySelector(%s);
+      if (!el) return 'null';
+      const r = el.getBoundingClientRect();
+      return JSON.stringify({x: r.left + window.scrollX, y: r.top + window.scrollY,
+                             width: r.width, height: r.height, scale: 1});
+    })()
+    """ % json.dumps(selector)))
+
+
+def capture_surface(code, surface, url=None, settle=8, root=None, navigate=True,
+                    element=None):
+    """Save one surface: both what it said and what it looked like.
+
+    Two artifacts, because they answer different questions: the html is what the assertion
+    scripts read, and the png is what product signs off on. A capture with only one of them
+    is half the evidence.
+
+    `navigate=False` captures wherever the browser already is, which is the only way to reach
+    the account-opening Schumer box: it is not a page but a section of the `personal_continued`
+    stage, so it exists only part-way through a walk and has no URL of its own. Navigating to
+    the apply URL to "capture" it lands on the first stage and screenshots the wrong screen.
+
+    Returns the capture record; also writes it, so a Run's evidence says which URL produced
+    which file rather than leaving that in a transcript.
+    """
+    if navigate:
+        resolved, blocked = surface_urls(code)[surface] if url is None else (url, None)
+        if resolved is None:
+            raise ValueError(blocked)
+        goto_url(resolved)
+        wait_for_load()
+        wait(settle)
+    else:
+        resolved, blocked = page_info()["url"], None
+
+    out = evidence_dir(code, root)
+    html_path = os.path.join(out, "%s_%s.html" % (surface, code))
+    png_path = os.path.join(out, "%s_%s.png" % (surface, code))
+
+    with open(html_path, "w", encoding="utf-8") as fh:
+        fh.write(js("document.documentElement.outerHTML"))
+
+    # The html is saved before any of this: the screenshot needs the DOM expanded, and the
+    # checkers must read the page as it was actually served.
+    if element:
+        _unclip_ancestors(element)
+        shot = cdp("Page.captureScreenshot", format="png", captureBeyondViewport=True,
+                   clip=_element_rect(element))
+        _reclip()
+    else:
+        shot = cdp("Page.captureScreenshot", format="png", captureBeyondViewport=True)
+    with open(png_path, "wb") as fh:
+        fh.write(__import__("base64").b64decode(shot["data"]))
+
+    record = {"code": code, "surface": surface, "url": resolved, "blocked_on": blocked,
+              "html": html_path, "screenshot": png_path, "page": page_info(),
+              "stage": stage() if not navigate else None}
+
+    index = os.path.join(out, "surfaces.json")
+    captured = json.load(open(index)) if os.path.exists(index) else {}
+    captured[surface] = record
+    with open(index, "w") as fh:
+        json.dump(captured, fh, indent=2, default=str)
+    return record

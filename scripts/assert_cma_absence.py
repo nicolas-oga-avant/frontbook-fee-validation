@@ -19,57 +19,22 @@ The two look identical in the output, so read the document before touching a pat
 """
 
 import argparse
-import html
-import json
 import os
-import re
+import sys
 
-REDLINE_REL = os.path.join("data", "redline-assertions.json")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# The summary box flattens to labels-then-values, so the Foreign Transaction cell cannot be
-# asserted on its own. This whole row pins it to None AND proves the cash advance sentence is
-# intact, which is what keeps the FX absence check from passing because the box lost content.
-SUMMARY_ROW = ("Cash Advance Foreign Transaction The greater of $10 or 3% of the amount "
-               "of the cash advance. None")
-
-_PUNCT = (("’", "'"), ("‘", "'"), ("“", '"'), ("”", '"'),
-          ("–", "-"), ("—", "-"), ("\xa0", " "))
-
-
-def flatten(path):
-    """The document as one line of normalized text, tags and entities resolved."""
-    raw = open(path, encoding="utf-8").read()
-    text = re.sub(r"(?is)<(script|style).*?</\1>", " ", raw)
-    text = re.sub(r"(?s)<[^>]+>", " ", text)
-    text = html.unescape(text)
-    for a, b in _PUNCT:
-        text = text.replace(a, b)
-    return re.sub(r"\s+", " ", text).strip()
-
-
-def _norm(s):
-    for a, b in _PUNCT:
-        s = s.replace(a, b)
-    return re.sub(r"\s+", " ", s).strip()
-
-
-def _redline(kind, path=None):
-    with open(path or REDLINE_REL) as fh:
-        for entry in json.load(fh)["assertions"]:
-            if entry["kind"] == kind:
-                return entry
-    raise KeyError(kind)
+from redline_text import (REDLINE_PATH, SUMMARY_ROW_BACKBOOK as SUMMARY_ROW, flatten,
+                          sentence)
 
 
 def checks(text, late_fee_initial, late_fee_subsequent, ftf, redline_path=None):
     """[(label, passed)] for one rendered document, backbook expectations."""
-    late = _norm(_redline("late_fee_paragraph", redline_path)["old_codes_expect"]).format(
-        late_fee_initial=late_fee_initial, late_fee_subsequent=late_fee_subsequent)
-    foreign_old = _norm(
-        _redline("foreign_transactions_paragraph", redline_path)["old_codes_expect"])
-    ftf_paragraph = _norm(
-        _redline("ftf_disclosure_paragraph", redline_path)["new_codes_expect"]).format(
-            foreign_transaction_fee=ftf)
+    late = sentence("late_fee_paragraph", "old", path=redline_path,
+                    late_fee_initial=late_fee_initial, late_fee_subsequent=late_fee_subsequent)
+    foreign_old = sentence("foreign_transactions_paragraph", "old", path=redline_path)
+    ftf_paragraph = sentence("ftf_disclosure_paragraph", "new", path=redline_path,
+                             foreign_transaction_fee=ftf)
 
     return [
         ("late fee paragraph, full sentence, $%s/$%s" % (late_fee_initial, late_fee_subsequent),
@@ -107,7 +72,7 @@ def main():
     ap.add_argument("--late-fees", nargs=2, default=("28", "39"),
                     metavar=("INITIAL", "SUBSEQUENT"))
     ap.add_argument("--ftf", default="3", help="frontbook foreign transaction fee percent")
-    ap.add_argument("--redline", default=REDLINE_REL)
+    ap.add_argument("--redline", default=REDLINE_PATH)
     args = ap.parse_args()
 
     kw = dict(late_fee_initial=args.late_fees[0], late_fee_subsequent=args.late_fees[1],

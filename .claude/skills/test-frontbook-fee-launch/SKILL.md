@@ -310,8 +310,7 @@ first entry - useful for saying how far ahead of the approved version the draft 
 
 Two layers. Run both.
 
-**Layer 1 - the value table.** Compare against the matrix row at five points, each catching a
-different failure:
+**Layer 1 - the value table.** Five points, each catching a different failure, plus RPF:
 
 | Point | Assert | Catches |
 | --- | --- | --- |
@@ -319,7 +318,32 @@ different failure:
 | Decisioned application | `expected_max_apr`, annual fee y1/y2 | a missing APR cap, which shows up as 29.99% where you expected 35.99% |
 | Agreement inputs | the three `cma_*` integers | the strategy-to-numbers boundary, with no render needed |
 | Rendered agreement | the five template sites | that the inputs reached the document |
-| CSP late fee label | matches the agreement | that the two cannot disagree |
+| CSP labels | match the agreement | that the two cannot disagree |
+| RPF | `$25`, from a fresh process | a stale Optimizely datafile (FINDINGS #5) |
+
+Four of the six can only be read from inside the stack. Collect them in the same runner script
+that issued and rendered, then assert them outside it:
+
+```ruby
+LocalRunObservations.collect!(account: cca.id, application: <application_id>, code: "<CODE>",
+                              rendered_html: "evidence/run-<CODE>/cma_<CODE>_log<N>.html")
+# => /usr/src/app/tmp/observations_<CODE>.json
+```
+
+```bash
+docker compose -p "$BASIC_PROJECT" cp web:/usr/src/app/tmp/observations_0122.json \
+    evidence/run-0122/observations.json
+python3 scripts/assert_value_table.py 0122 --observations evidence/run-0122/observations.json
+```
+
+Confetti is read live; every other point comes from the observations file. A point with no
+observation reports `NOT CAPTURED` and fails the Run - an uncaptured point and a passing one look
+identical in a summary, which is the whole reason it is not a skip.
+
+Two expectations in there look wrong and are not. `predecisioned_terms[:maximum_late_fee]` is
+asserted to be `35.0`, the policy constant: that surface carries no fee-launch amount at all, and
+no FX fee key (FINDINGS #34). And a monthly-fee strategy's year-two figure arrives under
+`monthly_membership_fee_year_two` rather than the annual key, so either satisfies the check.
 
 **Absence is a positive assertion.** For a backbook code the foreign transaction paragraph must
 **not** render and the summary row must read `None`. "I did not find it" is a pass only if the check
@@ -343,6 +367,58 @@ sentences.
 
 **Compare fee content, never bytes.** `evidence/baseline/cma_0122_local.html` was rendered against a
 different TemplateFlow instance and legitimately differs in unrelated ways.
+
+## Step 5b - The application-time surfaces
+
+The agreement is one of the surfaces the ticket asks for. The other three are Schumer boxes, all
+keyed to a strategy uuid, so **an MLA code reaches none of them** - its application-time evidence
+is `predecisioned_terms` plus the agreement (FINDINGS #8), and both `surface_urls()` and
+`assert_schumer_box.py` refuse an M code rather than passing while asserting nothing.
+
+```python
+surface_urls("0122")                     # surface -> (url, what blocks it, if anything)
+capture_surface("0122", "schumer_landing")  # html + png into evidence/run-0122/, indexed in surfaces.json
+```
+
+**The account-opening box is not one of those URLs.** It is a section of the `personal_continued`
+stage - the same stage that returns `predecisioned_terms` - so it exists only part-way through a
+walk. Reach it, then capture in place:
+
+```python
+goto_url(apply_url("0122")); wait_for_load(); wait(8)
+autofill_stage(); set_tu_scenario("approved"); fix_autofill_phone(); tick_consents_dom()
+submit_stage(); wait(14); wait_for_load()
+assert stage() == "personal_continued"
+capture_surface("0122", "schumer_account_opening", navigate=False, element="table.schumer-box")
+```
+
+Both arguments matter. Without `navigate=False` the capture reloads the apply URL and
+screenshots the **first** stage. Without `element` the screenshot clips: the box sits in a 240px
+scroll window over a 740px table, and what falls outside is the fee rows. A second Run needs
+`new_incognito_tab()` first - the previous applicant's session redirects `/apply` to `/home`.
+
+```bash
+python3 scripts/assert_schumer_box.py evidence/run-0120/schumer_basic_0120.html \
+    --code 0120 --control evidence/run-0122/schumer_basic_0122.html
+```
+
+Both artifacts, every time: the html is what the checker reads, the png is what product signs off
+on. Screenshots are named by Run and surface and live beside the render.
+
+**Read FINDINGS #35 before capturing any of them.** Every Schumer box hardcodes `Up to $39` and
+`Foreign Transaction: None` today, so a frontbook capture is **expected to fail** both fee
+assertions. CSRV-5843 owns the in-flow box and CSRV-5845 the landing pages; both are In Progress,
+so these checks pass the day they ship and fail honestly until then. Report it as a result, never
+retry the capture.
+
+The checker says which kind of failure it is. Its `CONTROL annual fee row` check is
+strategy-driven today, so a run where **only the two launch rows fail** is the pending disclosure,
+and a run where the control or the `box rendered` guard fails is a broken capture - a screenshot of
+the wrong stage fails the fee rows too. Confirmed on `0122` (`$0`) and `9004` (`$125`).
+
+The standalone `/schumer_box/<uuid>` page exists only on `mp`, and the landing page is blocked on
+CSRV-5845 + CSRV-5846. Capture them anyway once reachable, so the flip is evidenced by a before and
+an after rather than asserted from one post-deploy state.
 
 ## Step 6 - Report
 

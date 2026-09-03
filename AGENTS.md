@@ -128,13 +128,13 @@ AGENTS.md      this file - entry point and rules (README.md, CLAUDE.md are symli
 ROADMAP.md     the objective, the two phases, dependency state, and the checklist
 DESIGN.md      what the skill is and why it is shaped this way
 SETUP.md       replicable environment setup, the services involved, and the traps
-FINDINGS.md    32 platform findings - every failure mode, with evidence
+FINDINGS.md    36 platform findings - every failure mode, with evidence
 CONTEXT.md     glossary
 
 .claude/skills/test-frontbook-fee-launch/
                SKILL.md - the runbook for one Run; bootstrap.sh - idempotent setup
 data/          run-matrix.csv (28 Runs, expected values, UUIDs), redline assertions, source sheet
-scripts/       apply_harness.py, assert_cma_absence.py, extract_redline_assertions.py
+scripts/       apply_harness.py, the assert_* checkers, redline_text.py, extract_redline_assertions.py
 local-stack/   the untracked overrides that make the stack work, plus restore.sh
 evidence/      captured artifacts; baseline/ holds the verified pre-change 0122 render
 reference/     the L&C-approved redline (LGL-7960) - read the .docx, never a PDF export

@@ -1,0 +1,21 @@
+{
+  "schumer_account_opening": {
+    "code": "0122",
+    "surface": "schumer_account_opening",
+    "url": "http://localhost:5001/apply/13?product_type=credit_card&strategy=f7ca3250-5403-40f1-9627-8e274349aff7#/personal_continued",
+    "blocked_on": null,
+    "html": "/Users/ichigolas/Source/avant/frontbook-fee-validation/evidence/run-0122/schumer_account_opening_0122.html",
+    "screenshot": "/Users/ichigolas/Source/avant/frontbook-fee-validation/evidence/run-0122/schumer_account_opening_0122.png",
+    "page": {
+      "url": "http://localhost:5001/apply/13?product_type=credit_card&strategy=f7ca3250-5403-40f1-9627-8e274349aff7#/personal_continued",
+      "title": "\ud83d\udc34 Avant",
+      "w": 2560,
+      "h": 1272,
+      "sx": 0,
+      "sy": 0,
+      "pw": 2545,
+      "ph": 2006
+    },
+    "stage": "personal_continued"
+  }
+}

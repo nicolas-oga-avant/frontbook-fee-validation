@@ -1,0 +1,35 @@
+{
+  "probed_at": "2026-09-03T11:48:48-03:00",
+  "stack": "local basic, branch main, compose project basic-frontbook-fee-validation",
+  "why": "The three application-time surfaces, probed on the trunk the local stack runs. A 404 here is the surface being absent from this trunk, not the disclosure being absent from the surface - see FINDINGS #35.",
+  "surfaces": {
+    "0122": {
+      "schumer_basic": {
+        "url": "http://localhost:5001/schumer_box/f7ca3250-5403-40f1-9627-8e274349aff7",
+        "status": 404
+      },
+      "schumer_account_opening": {
+        "url": "http://localhost:5001/apply?product_type=credit_card&strategy=f7ca3250-5403-40f1-9627-8e274349aff7",
+        "status": 302
+      },
+      "schumer_landing": {
+        "url": "http://localhost:5001/credit-card/landing/schumer/f7ca3250-5403-40f1-9627-8e274349aff7",
+        "status": 404
+      }
+    },
+    "0120": {
+      "schumer_basic": {
+        "url": "http://localhost:5001/schumer_box/173b1fb8-525e-488e-9353-63df8b253542",
+        "status": 404
+      },
+      "schumer_account_opening": {
+        "url": "http://localhost:5001/apply?product_type=credit_card&strategy=173b1fb8-525e-488e-9353-63df8b253542",
+        "status": 302
+      },
+      "schumer_landing": {
+        "url": "http://localhost:5001/credit-card/landing/schumer/173b1fb8-525e-488e-9353-63df8b253542",
+        "status": 404
+      }
+    }
+  }
+}

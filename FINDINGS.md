@@ -957,3 +957,170 @@ customer whose application declines.
 
 The one-line `avant-basic` defect in FINDINGS #3 is still real and still unowned, but it is not what
 blocks MLA testing, and fixing it would not have unblocked anything.
+
+## 34. `predecisioned_terms` carries no fee-launch amount at all
+
+**Symptom.** The application-time surface the ticket names for the 12 MLA codes turns out to
+disclose neither of the two fees the launch changes. An assertion written from the ticket's wording
+- "read `predecisioned_terms` and assert late fees, FX fee, APR, annual fees" - fails on every Run,
+frontbook and backbook alike, against a correct template.
+
+**Cause.** The hash is built in `Avant::Decisioning::Interface::Card::Base#predecisioned_terms`
+(`lib/avant/decisioning/interface/card/base.rb:22-41`), and its fourteen keys have no foreign
+transaction fee. Its one late fee key is not the schedule:
+
+```ruby
+# lib/avant/decisioning/interface/card/base.rb:132
+def predecisioned_maximum_late_fee
+  application.policy.maximum_late_fee     # => 35.0, a constant on every policy version
+end
+```
+
+`maximum_late_fee` is `35.0` on v1, v4, v5, v6 and v7 alike, and neither subclass under
+`interface/card/unsecured/` overrides it. So `predecisioned_terms[:maximum_late_fee]` is `"35.0"`
+for a `0122` applicant and `"35.0"` for a `0120` one. Verified on `9b603b8` (main, the trunk under
+test), which already contains CSRV-5298.
+
+**What it can still prove.** APR, the annual fees and the minimum credit line, all of which are
+strategy-derived, and the fact that the applicant reached a decision under the code the Run is for.
+`assert_value_table.py`'s application point asserts exactly those and pins the `35.0` explicitly, so
+the gap is recorded on every Run rather than rediscovered.
+
+**Where the fee amounts do reach an application-time surface**: the Schumer box, which is the other
+half of the ticket - and see #35 for what that one does with them.
+
+**This is a result, not a workaround** - and it is already owned. CSRV-5841 adds
+`late_fee_initial`, `late_fee_subsequent` and `foreign_transaction_fee` to `predecisioned_terms`;
+it is In Progress and not on `9b603b8`, which is why the keys are absent here. CSRV-5843 then reads
+them in the Schumer box. So the value table asserts the `35.0` as today's truth, and this finding
+is the thing to re-check when CSRV-5841 merges - at which point the fee amounts become assertable
+on this surface and the expectation here changes.
+
+## 35. Every Schumer box is strategy-blind on both launch rows
+
+**Symptom.** Two things at once, and the first hides the second. On `main` a request to
+`/schumer_box/<uuid>` 404s; on `mp` it renders, and renders the pre-change disclosure for a
+frontbook code.
+
+**Cause, part one - the route is `mp`-only.** `config/routes.rb` on `origin/mp` (`8030fc5`) has:
+
+```ruby
+get "/schumer_box/:pricing_strategy_uuid" => "schumer_box#show", :as => :schumer_box
+```
+
+`origin/main` (`121ac52`) has no `schumer` route at all, and no `SchumerBoxController`. So the
+ticket naming dev-mp for this surface is not a preference between two environments - it is the only
+trunk where the page exists. ROADMAP 1.7 asked not to resolve that by picking one; it resolves
+itself. A Run pinned to `main` cannot capture this surface, and should record it as unreachable
+rather than as absent content.
+
+**Cause, part two - the two rows are hardcoded.** `app/views/schumer_box/show.html.erb` on `mp`:
+
+```erb
+<li><strong>None</strong></li>                                          <!-- Foreign Transaction -->
+<li>Up to <strong><%= AppConfig.credit_card_limits.max_late_payment.formatted %></strong></li>
+```
+
+`max_late_payment` is `"$39"` in `config/policies/constants/us.yml:239`, the same on both trunks.
+`SchumerBoxController#show` builds `@schumer_data` from the strategy's Confetti entry, but it reads
+only `spread`, the annual and monthly fees, the apr cap and four display flags - it never reads
+`late_fee_initial`, `late_fee_subsequent` or `foreign_transaction_fee`, the three keys CSRV-5298
+added.
+
+**So, today, on `mp`:** every strategy's standalone Schumer box says `Up to $39` and
+`Foreign Transaction: None`. A frontbook Run fails both assertions; a backbook Run passes them
+vacuously, which is why `assert_schumer_box.py` insists on a frontbook control and reports a check
+that passes on both as `NO TEETH`.
+
+**Not a harness bug and not to be worked around** (hard rule 2). Either CSRV-5843/5845 wire the new
+amounts into this surface, or the launch ships with an application-time disclosure quoting the old
+fees. Which one is a question for product, and the evidence for asking it is a capture of this page
+for a frontbook uuid.
+
+### Part three - the box customers actually see is on `main`, and does the same thing
+
+The standalone page above is the lesser half. The Schumer box is **also** rendered inside the apply
+flow itself, on the `personal_continued` stage (`version_config.yml:618`, the same stage that
+returns `predecisioned_terms`), and that one exists on `main` and is what an applicant sees today.
+
+**Walked and captured 2026-09-03** on the local `main` stack, two frontbook strategies:
+
+| Run | Annual Fee row | Foreign Transaction | Late Fee |
+| --- | --- | --- | --- |
+| `0122` (application 13) | `$0` | **None** | **Up to $39** |
+| `9004` (application 14) | `Introductory fee of $125 for the first year. After that, $125.04 and billed monthly at $10.42.` | **None** | **Up to $39** |
+
+The annual fee row proves the box **is** strategy-driven and reads the right strategy - `9004` even
+renders the introductory-annual-fee case the redline's second Schumer Box describes. The two launch
+rows are hardcoded anyway. Evidence: `evidence/run-0122/schumer_account_opening_0122.{html,png}`
+and the same for `9004`.
+
+**Which code renders it.** ~~The `avant_views` gem's HAML partials, so the fix is a gem release
+plus a Gemfile bump~~ - **wrong, and worth knowing why.** `avant_views-3.11.2` does carry two
+Schumer partials that hardcode exactly these rows
+(`.../v2/components/helpers/_schumer_box.html.haml:80,93` and
+`v3/.../schumer_box/_credit_card.html.haml:54,70`), and grepping the bundle finds them first. They
+are the **legacy Angular renderer** and did not render this page.
+
+The capture settles it: zero `ng-if` attributes (the HAML is full of them), a CSS-modules class
+`_schumer-box_3iywt_1`, and the bundle it loaded:
+
+```
+https://d1wwep6nkcr60g.cloudfront.net/micro_frontends/11.4.0/assets/main-ZjEofC42.js
+```
+
+So it is the **React micro-frontend** - `SchumerBox.tsx` in customer-application-frontend, which is
+what CSRV-5843 names. Two dead HAML copies of the same disclosure are still in the gem; that is a
+trap for the next person grepping, not the fix site.
+
+**The bundle is pinned by URL**, `react_index_url` in `version_config` (v6.1 -> `11.4.0`), so the
+local stack keeps serving the old box until CSRV-5844 bumps that value. It also means the local
+stack **can** validate CSRV-5843 before CSRV-5844 lands, by pointing `react_index_url` at the CAF
+preview build - the only way to get a pre-deploy assertion out of this surface.
+
+**Tracked, not an open question.** CSRV-5843 (account-opening box, In Progress) and CSRV-5845
+(landing pages, In Progress) each own one surface, and both quote the same approved string,
+`3% of each foreign transaction in U.S. dollars.` (LGL-7971). So the assertions here are expected
+to fail until those ship. Keep them failing and keep them accurate: a fee row that fails is the
+pending state, a **box-rendered** guard that fails is a broken capture.
+
+**Capturing it needs a walk, not a URL.** The box is a section of a stage, so it exists only
+part-way through an application and has no address of its own. It also sits in a 240px scroll
+window over a 740px table, so a plain screenshot clips off the fee rows - exactly the rows in
+question. `capture_surface(..., navigate=False, element="table.schumer-box")` handles both.
+
+## 36. Optimizely answers from a datafile committed to the repo, so RPF is unverifiable locally
+
+**Symptom.** A correctly issued `0122` account reads as RPF-ineligible with zero fee amounts:
+
+```json
+{"can_assess_rpf_fees": false, "initial_fee_amount_cents": 0, "sequential_fee_amount_cents": 0}
+```
+
+No error, no warning. It looks exactly like the product defect the RPF assertion exists to catch.
+
+**Cause.** With no sdk key the client is built from a **snapshot file in the repo**:
+
+```ruby
+# config/initializers/129_optimizely.rb:37
+unless sdk_key.present? || Avant::Env.production_env?
+  return Optimizely::OptimizelyFactory.default_instance(sdk_key, datafile)
+end
+```
+
+`config/optimizely/datafile.json` is at **revision 1947**, and none of the campaign's 28 codes are
+in the `card_rpf_fees` audience it carries - its 43 entries are the pre-2026-08-26 set. Its staging
+variation still holds `3200`/`4300`, the stale amounts FINDINGS #5 recorded. So every Run falls
+through to the rollout's default rule, which is `false` / `0` / `0` by design.
+
+**What it means for a Run.** RPF cannot be validated on the local stack as configured. The
+collector stamps `sdk_key_present` and `datafile_revision`, and `assert_value_table.py` reports the
+point as `NO ANSWER` rather than as a failure - while still failing the Run, because an unanswered
+point is not a pass. Reporting `$0` as a defect would be a false result; reporting it as a pass
+would be worse.
+
+**To actually verify it**, one of two things: set `OPTIMIZELY_SDK_KEY` on the basic container, which
+switches the client to the HTTP config manager and a live datafile, or refresh
+`config/optimizely/datafile.json` from the project. Both are real changes to a shared checkout, so
+neither was done here. The first is the right one - the local snapshot going stale is what produced
+this.

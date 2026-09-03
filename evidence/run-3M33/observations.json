@@ -1,0 +1,51 @@
+{
+  "code": "3M33",
+  "collected_at": "2026-09-03T14:47:24Z",
+  "credit_card_account_id": 3,
+  "application_id": 9,
+  "application": {
+    "decision_path_strategy": "3303",
+    "predecisioned_terms": {
+      "apr": "0.3599",
+      "spread": "1",
+      "is_daily_balance": "false",
+      "maximum_late_fee": "35.0",
+      "show_overlimit_fee": "true",
+      "minimum_credit_line": "300.0",
+      "show_annual_fee_box": "true",
+      "annual_membership_fee": "0",
+      "monthly_membership_fee": "0",
+      "show_returned_payment_fee": "true",
+      "is_returned_payment_fee_code": "true",
+      "annual_membership_fee_year_two": "39",
+      "monthly_membership_fee_year_two": "0",
+      "annual_fee_above_minimum_credit_line_threshold": false
+    }
+  },
+  "agreement_inputs": {
+    "cma_pricing_strategy_identifier": "3M33",
+    "cma_fee_terms": {
+      "late_fee_initial": 30,
+      "late_fee_subsequent": 41,
+      "foreign_transaction_fee": 3
+    }
+  },
+  "csp": {
+    "late_fee_structure": "1st: up to $30 | Subsequent: up to $41",
+    "foreign_transaction_fee": "3% of each foreign transaction"
+  },
+  "rpf": {
+    "initial_fee_amount_cents": 0,
+    "sequential_fee_amount_cents": 0,
+    "can_assess_rpf_fees": false,
+    "fee_eligible": false,
+    "fresh_process": true,
+    "process_age_seconds": 16,
+    "sdk_key_present": false,
+    "datafile_revision": "1947"
+  },
+  "rendered": {
+    "html": "evidence/run-3M33/cma_3M33_log7.html"
+  },
+  "errors": {}
+}

@@ -27,7 +27,7 @@ amounts on a real rendered agreement.
 | Cardmember agreement (CMA) | rendered letter, production TemplateFlow | all 28 |
 | `predecisioned_terms` | avant-basic, post-decision | all 28 - the **only** application-time surface an MLA code has |
 | avant-basic Schumer box | `/schumer_box/<uuid>` (dev-mp) | the 8 base codes + 8 predecessors |
-| Account-opening Schumer box | `/apply?product_type=credit_card&strategy=<uuid>` | same, once CSRV-5843 + CSRV-5844 deploy |
+| Account-opening Schumer box | the `personal_continued` stage of `/apply?...&strategy=<uuid>` | same - **renders today**; CSRV-5843 + CSRV-5844 add the new amounts, not the box |
 | Contentful Schumer landing page | `/credit-card/landing/schumer/<uuid>` | same, once CSRV-5845 + CSRV-5846 ship |
 
 MLA codes have **no UUID**, so no `/schumer_box`, no `/apply?strategy=` and no landing page exists
@@ -66,8 +66,9 @@ alone does not say which template it is a version of. No `git_sha_version` exist
 | Confetti `basic.pricing_strategy` (fees) | v17, dev and prd |
 | Confetti param-to-id / apr-caps (+8 UUIDs) | dev only; prd promotion deferred to CSRV-5823 |
 | Optimizely RPF audience + staging fee amounts | done, both environments |
-| CSRV-5843 (CAF account-opening Schumer box) | **In Progress** - gates the `/apply?strategy=` surface |
-| CSRV-5844 (avant-basic `react_index_url` bump to that CAF release) | **Created**, not started - gates it too |
+| CSRV-5841 (avant-basic: fee terms into `predecisioned_terms`) | **In Progress** - gates CSRV-5843's data (FINDINGS #34) |
+| CSRV-5843 (CAF `SchumerBox.tsx`) | **In Progress** - gates the new amounts in the in-flow box |
+| CSRV-5844 (avant-basic `react_index_url` bump to that CAF release) | **Created**, not started - gates delivery, not development (see 1.7) |
 | CSRV-5845 (avant-redesign landing-page disclosure) | **In Progress** - gates the Contentful surface |
 | CSRV-5846 (Contentful: 8 new landing pages) | **Created**, not started - gates it too |
 
@@ -259,7 +260,38 @@ told it is unrunnable. It turned out to matter for the other 16 too - see FINDIN
 ### 1.6 Assertions
 
 - [x] Layer 2 assertions derived from the approved redline into `data/redline-assertions.json`
-- [ ] Layer 1 value table, all five assertion points
+- [x] `scripts/redline_text.py` owns the redline and the flattening, so a sentence cannot drift
+      between the three checkers. `assert_cma_absence.py` was moved onto it and re-run on the
+      `0120`/`0122` pair: byte-identical output, so the refactor changed nothing it asserts
+- [x] Layer 1 value table, all five assertion points - all five PASS on `0122`, `0120`
+      and `3M33` as of 2026-09-03
+  - [x] `scripts/assert_value_table.py`, expectations from `run-matrix.csv` and sentences from
+        the redline, never a literal. Six points: the five plus RPF
+  - [x] The **Confetti** point verified live against dev for **all 28 codes** - fees, apr cap,
+        and `param_to_id` or `code_to_mla` per code. Zero failures. The whole config layer of the
+        campaign is now proven without a browser
+  - [x] The **rendered agreement** point verified on all three existing renders (`0122`, `0120`,
+        `3M33`), including the summary box selected by the Run's annual-fee shape rather than
+        asserted twice (FINDINGS #10)
+  - [x] `local-stack/zzz_local_run_observations.rb` collects the four in-stack points into
+        `observations_<code>.json`; wired into `restore.sh`, `bootstrap.sh`'s patch list and its
+        boot-log assertion
+  - [x] **Exercised on the booted stack 2026-09-03.** The collector ran for `0122`, `0120` and
+        `3M33`; all three observations files are in `evidence/run-<code>/observations.json`, and
+        **every one of the five points now PASSES on all three Runs** - decision path strategy,
+        APR, both annual fees, the three `cma_fee_terms` integers, the five template sites, and
+        both CSP labels
+  - [x] Two things the first run found. `CustomerApplication`, not `Application`, is the model
+        (the collector said so and stopped rather than collecting nothing). And
+        `predecisioned_terms[:apr]` is a **fraction** - `"0.3599"` where the matrix quotes
+        `35.990` - so the check normalizes anything below 1, no card here being priced under 1%
+  - [ ] RPF is the one point that does not answer: **FINDINGS #36**. Optimizely is served from
+        `config/optimizely/datafile.json`, revision 1947, whose `card_rpf_fees` audience predates
+        this campaign - none of the 28 codes are in it, so every Run reads `false` / `0` / `0`.
+        Reported as `NO ANSWER`, which still fails the Run. Needs `OPTIMIZELY_SDK_KEY` on the
+        basic container, a change to a shared checkout that was not made here
+  - [x] An uncaptured point is not a pass: `NOT CAPTURED` is counted separately from `PASS` and
+        fails the Run, because the two are indistinguishable in a summary
 - [x] Absence assertions for backbook codes: no FX paragraph, summary row reads `None`
   - [x] `scripts/assert_cma_absence.py`, sentences read from `data/redline-assertions.json`
         rather than copied. Verified on `0120`
@@ -269,46 +301,119 @@ told it is unrunnable. It turned out to matter for the other 16 too - see FINDIN
   - [x] The summary box flattens to labels-then-values, so the Foreign Transaction cell cannot
         be asserted alone. The check pins the whole row, which fixes the cell at `None` *and*
         proves the cash advance sentence is still intact
-- [ ] Assertion failures reported as results, never quietly fixed to make a Run proceed
+- [x] Assertion failures reported as results, never quietly fixed to make a Run proceed
   - [x] Both first-pass failures on `0120` were the checker's own patterns, not the document -
         confirmed by reading the flattened text before touching them. The distinction is now in
         the script's docstring, since the output cannot show it
+  - [x] Two expectations that look like defects in the checker are recorded as results instead:
+        `predecisioned_terms` carries no fee-launch amount (FINDINGS #34), and the standalone
+        Schumer box hardcodes the pre-change ones (FINDINGS #35). Both are asserted as they
+        actually behave, with the finding named, rather than quietly dropped from the table
 
-### 1.7 The application-time surfaces  (NOT STARTED)
+### 1.7 The application-time surfaces  (IN PROGRESS)
 
-Everything above validates the CMA - one of the five surfaces CSRV-5300 asks for. Nothing in this
-repo has yet loaded a Schumer box or read `predecisioned_terms`, so four of the ticket's eight
-acceptance criteria are currently unaddressed. `apply_harness.py` already drives the apply flow, so
-the browser cost is mostly paid; what is missing is the assertions and the capture.
+Everything above validates the CMA - one of the five surfaces CSRV-5300 asks for. The checkers and
+the capture now exist; what is missing is a Run that walks them, and two of the three surfaces are
+still blocked on their own tickets.
 
-- [ ] Assertion set for the Schumer box derived from the **same** `data/redline-assertions.json`,
-      not re-typed. The redline's two Schumer Boxes are two test cases of one site, tagged
-      `summary_box` - assert only the box whose annual-fee shape matches the Run (FINDINGS #10)
-  - [ ] Frontbook: `Up to $41` ceiling row and the `3% of each foreign transaction in U.S. dollars.`
-        row (Row A governs; Row B is an approved-doc typo)
-  - [ ] Backbook: `Up to $39` and a Foreign Transaction row reading `None`
-  - [ ] Every absence check proven to flip on the frontbook control, same `NO TEETH` rule as
-        `assert_cma_absence.py`
-- [ ] **`predecisioned_terms`** read and asserted per Run - late fees, FX fee, APR, annual fees.
-      This is the only application-time surface that exists for the 12 MLA codes, and the ticket
-      names it as the 3M33 verification path alongside the CMA
+**The two frontbook rows are expected to fail, and that is the point.** CSRV-5843 (in-flow box)
+and CSRV-5845 (landing pages) each own one surface and neither has shipped, so an assertion written
+today fails today and passes the moment they do. Developing them now is what makes the flip
+evidenced rather than asserted. What must never fail for that reason is the `box rendered` guard or
+the annual-fee control: those failing means the capture is broken, not the disclosure.
+
+**Read FINDINGS #35 first.** Reading the code answered two of this section's open questions and
+turned one of them into a result: `/schumer_box/<uuid>` exists only on `mp`, and where it exists it
+hardcodes `Up to $39` and `Foreign Transaction: None` for every strategy. A frontbook capture is
+**expected to fail** both fee assertions today.
+
+- [x] Assertion set for the Schumer box derived from the **same** `data/redline-assertions.json`,
+      not re-typed. `scripts/assert_schumer_box.py`, asserting only the box whose annual-fee shape
+      matches the Run (FINDINGS #10), which `summary_box_for()` derives from the matrix row
+  - [x] Frontbook: the `Up to $41` ceiling row and the `3% of each foreign transaction in U.S.
+        dollars.` row (Row A governs; Row B is an approved-doc typo)
+  - [x] Backbook: `Up to $39` and a Foreign Transaction row reading `None`
+  - [x] Every absence check proven to flip on the frontbook control, same `NO TEETH` rule as
+        `assert_cma_absence.py`. Exercised against the two CMA summary boxes, which are the same
+        disclosure: 4 of 4 discriminate. The first version scored 3 of 4 - a bare `"None" in text`
+        passes on a frontbook document that says None anywhere else, so the value is matched
+        inside a window after its own row label
+  - [x] Refuses an MLA code outright rather than passing while asserting nothing
+  - [x] Run against a real capture 2026-09-03 (`0122` and `9004`, account-opening box). The
+        checker's assumptions about how the page flattens hold: the box-rendered guard passes and
+        both fee checks fail on content, not on a pattern
+- [x] **`predecisioned_terms`** read and asserted per Run - but **not for the fees**. It carries no
+      foreign transaction fee key at all, and its `maximum_late_fee` is the policy constant `35.0`,
+      not the schedule (FINDINGS #34). So the value table asserts what is actually strategy-derived
+      there - APR, both annual fees, and the decision path strategy - and pins the `35.0` so the gap
+      is recorded on every Run
+  - [ ] Product question, not a harness gap: if the applicant is meant to see the new late fee
+        before they have an account, this surface cannot currently show it
 - [ ] **avant-basic `/schumer_box/<uuid>`** on dev-mp for `0122`, `0123`, `3303`, and $39 / `None`
       still on `0120`, `0121`, `3302`
-  - [ ] The ticket says dev-mp; the local stack defaults to `main`. Do not resolve this by
-        picking one - run it on whichever trunk the Run is pinned to (1.8) and stamp the branch
-        on the evidence
-- [ ] **Account-opening Schumer box** at `/apply?product_type=credit_card&strategy=<uuid>`, same six
-      codes. **Blocked on CSRV-5843 + CSRV-5844.** Capture a pre-deploy render anyway, so the flip
-      is evidenced rather than asserted from a single post-deploy state
+  - [x] ~~run it on whichever trunk the Run is pinned to and stamp the branch on the evidence~~
+        **Resolved, and not by picking one.** The route and `SchumerBoxController` exist on
+        `origin/mp` only; `origin/main` has neither. A Run pinned to `main` records the surface as
+        unreachable rather than as absent content
+  - [x] Confirmed empirically on the running `main` stack 2026-09-03: `/schumer_box/<uuid>`
+        returns **404** for the frontbook uuid and for the backbook one alike, and the landing
+        page 404s too. `evidence/surface-probe-main.json` records the six probes. A `main` Run
+        reports this surface unreachable; it is not evidence about the disclosure
+  - [ ] The frontbook half is expected to FAIL when it is finally captured on `mp`: the view
+        never reads the three keys CSRV-5298 added. Capture it anyway - the capture is the
+        evidence for asking product whether the launch ships with an application-time disclosure
+        quoting the old fees
+- [x] **Account-opening Schumer box**, same six codes. **Captured and asserted 2026-09-03**, and it
+      is a RESULT: both frontbook strategies walked quote `Up to $39` and `Foreign Transaction:
+      None` (FINDINGS #35 part three)
+  - [x] It is **not** at `/apply?...&strategy=<uuid>`, and it is not blocked. The box is a section
+        of the `personal_continued` stage - the same stage that returns `predecisioned_terms` - so
+        it renders today on `main` and is reached by walking, not by navigating. What CSRV-5843 and
+        CSRV-5844 add is the new content, not the surface
+  - [x] `0122` (application 13) and `9004` (application 14) captured, html and png, under
+        `evidence/run-<code>/`. The annual fee row differs correctly between them - `$0` versus the
+        `$125` introductory text - so the box demonstrably reads the strategy and hardcodes the two
+        launch rows anyway. That control is what makes this a defect rather than a mis-walk
+  - [x] Two harness gaps this exposed, both fixed: `capture_surface()` navigated by URL and so
+        screenshotted the first stage rather than the box (`navigate=False`), and a plain
+        screenshot clips the box, which lives in a 240px scroll window over a 740px table, cutting
+        off the fee rows (`element="table.schumer-box"` unclips the ancestors and clips the shot to
+        the element)
+  - [x] The fix site is CAF's `SchumerBox.tsx`, exactly as CSRV-5843 says. An earlier note here
+        blamed the `avant_views` HAML partials; those are the legacy Angular renderer and hardcode
+        the same rows, but did not render this page (FINDINGS #35). The bundle is pinned by
+        `react_index_url` to `micro_frontends/11.4.0`
+  - [ ] **Assert against the CAF preview build before CSRV-5844.** Pointing `react_index_url` at
+        the preview bundle is the only way to get a pre-deploy pass out of this surface, and it
+        turns CSRV-5844 into a delivery step rather than a blocker on validation
+  - [ ] Five of the ticket's six not yet walked: `0123`, `3303`, `0120`, `0121`, `3302`. The two
+        captured establish the defect; they are not the ticket's per-strategy evidence. `9004` was
+        walked as the strategy-sensitivity control, and belongs to CSRV-5303 rather than to this
+        six
 - [ ] **Contentful landing page** `/credit-card/landing/schumer/<uuid>` agrees with `/apply` for the
-      three frontbook codes, per runbook step 15.b. **Blocked on CSRV-5845 + CSRV-5846**
-- [ ] **RPF `$25`** asserted per Run, from a fresh process. It comes from Optimizely, is memoised per
-      `CreditCardAccount`, and the staging rule order can serve `$1.00/$21.40` for one hardcoded
-      product uuid (FINDINGS #5). `expected_rpf` is already a column in `data/run-matrix.csv` and
-      nothing reads it yet
-- [ ] A screenshot per surface per strategy, named by Run and surface, stored under
-      `evidence/run-<code>/` beside the html and pdf. The ticket asks for these attached, so the
-      artifact has to carry them rather than link a console transcript
+      three frontbook codes, per runbook step 15.b. **Blocked on CSRV-5845 + CSRV-5846** - and
+      5845's own first acceptance criterion is that 5846 lands first, because all eight pages
+      currently 404, which is what this repo's probe already measured
+  - [x] CSRV-5845's own preview deploy probed against prod for `0120` and captured under
+        `evidence/pr-preview/`. Both are the Gatsby shell with no disclosure in the body, so the
+        PR's build changes nothing this campaign can assert yet - the page has to exist first,
+        which is CSRV-5846. Kept as the before half of the before-and-after
+- [x] `surface_urls(code)` in the harness builds all three URLs per code and names what blocks each,
+      off `SCHUMER_BASE` / `LANDING_BASE` so a Run can be pointed at basic-mp without an edit. An
+      MLA code gets three `None`s and the reason, not a URL built with `strategy=None`
+- [ ] **RPF `$25`** asserted per Run, from a fresh process
+  - [x] The value table asserts it against `expected_rpf` from the matrix, and refuses to call a
+        read from a stale process a pass - the collector stamps the process age and whether it is a
+        console, since the amounts are memoised per account and served from a polled datafile
+        (FINDINGS #5)
+  - [x] Exercised, and it answered honestly: the datafile is a stale committed snapshot, so the
+        point reports `NO ANSWER` with the revision rather than `$0` as a defect (FINDINGS #36)
+- [x] A screenshot per surface per strategy, named by Run and surface, stored under
+      `evidence/run-<code>/` beside the html and pdf. `capture_surface()` writes the html and the
+      png together and indexes both in `surfaces.json` with the URL that produced them - the html
+      is what the checkers read, the png is what product signs off on
+  - [x] Executed for the account-opening box on `0122` and `9004`; `surfaces.json` in each Run
+        directory records the URL, the stage and both files
 
 ### 1.8 Branch flexibility - main or mp
 

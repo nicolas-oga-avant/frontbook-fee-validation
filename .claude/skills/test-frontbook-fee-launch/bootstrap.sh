@@ -216,7 +216,8 @@ if [ "$VERIFY_ONLY" = "--verify" ]; then
            config/initializers/zzz_local_mla_stub.rb \
            config/initializers/zzz_local_consolidated_cma.rb \
            config/initializers/zzz_local_render_provenance.rb \
-           config/initializers/zzz_local_cma_render.rb; do
+           config/initializers/zzz_local_cma_render.rb \
+           config/initializers/zzz_local_run_observations.rb; do
     [ -f "$VALIDATION_ROOT/avant-basic/$f" ] || die "missing patch: avant-basic/$f"
   done
   ok "patches present"
@@ -286,7 +287,7 @@ ok "TemplateFlow key reached the container"
 bootlog="$(cd "$VALIDATION_ROOT/avant-basic" && docker compose -p "$BASIC_PROJECT" exec -T web \
   sh -c 'grep -h "\[local\]" log/development.log 2>/dev/null' 2>/dev/null || true)"
 for want in 'LocalConsolidatedCma active' 'LocalRenderProvenance active' 'LocalMlaStub active' \
-            'FakeTransunion mock registered'; do
+            'LocalRunObservations active' 'FakeTransunion mock registered'; do
   case "$bootlog" in
     *"$want"*) ok "boot log: $want" ;;
     *) die "no '[local] $want' in log/development.log.
