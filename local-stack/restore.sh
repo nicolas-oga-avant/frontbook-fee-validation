@@ -22,6 +22,10 @@ fi
 
 ROOT="${AVANT_ROOT:-$(cd "$HERE/../../.." && pwd)}"
 
+# Compose project names are keyed to the branch under test, so restoring against an `mp`
+# checkout does not bring up (or reference) the `main` stack. Default is main, unsuffixed.
+. "$HERE/branch-env.sh"
+
 for repo in avant-basic credit-card-api crm; do
   [ -d "$ROOT/$repo" ] && continue
   echo "FATAL: $repo not found under $ROOT" >&2
@@ -97,9 +101,9 @@ if [ "${1:-}" = "--up" ]; then
 
   echo
   echo "Starting stacks..."
-  (cd "$ROOT/avant-basic"     && docker compose -p basic-frontbook-fee-validation up -d web sidekiq)
-  (cd "$ROOT/credit-card-api" && docker compose -p ccapi-frontbook-fee-validation up -d web sidekiq)
-  (cd "$ROOT/crm"             && docker compose -p crm-frontbook-fee-validation  up -d web)
+  (cd "$ROOT/avant-basic"     && docker compose -p "$BASIC_PROJECT" up -d web sidekiq)
+  (cd "$ROOT/credit-card-api" && docker compose -p "$CCAPI_PROJECT" up -d web sidekiq)
+  (cd "$ROOT/crm"             && docker compose -p "$CRM_PROJECT"  up -d web)
   echo
   echo "Waiting for basic (first boot restores a large DB dump, several minutes)..."
   until [ "$(curl -s -m 8 -o /dev/null -w '%{http_code}' http://localhost:5001/ 2>/dev/null)" = "200" ]; do sleep 10; done
@@ -107,19 +111,21 @@ if [ "${1:-}" = "--up" ]; then
   # The CRM client bundle lives in the container's writable layer, so any recreate loses it and
   # every request 500s on `Failed to lookup view "login.ejs"`.
   echo "Building the CRM client bundle (required after any recreate, ~53s)..."
-  (cd "$ROOT/crm" && docker compose -p crm-frontbook-fee-validation exec -T web sh -c 'cd /app && yarn webpack' >/dev/null)
+  (cd "$ROOT/crm" && docker compose -p "$CRM_PROJECT" exec -T web sh -c 'cd /app && yarn webpack' >/dev/null)
   echo "  crm    ready on :4000"
   echo "  ccapi  on :7100"
 else
-  cat <<'EOF'
+  # Unquoted heredoc: the project names and paths are branch-dependent, and a copy-paste
+  # command carrying a literal $BASIC_PROJECT targets nothing.
+  cat <<EOF
 
 Now bring the stacks up (or re-run with --up):
 
-  cd ~/Source/avant/avant-basic     && docker compose -p basic-frontbook-fee-validation up -d web sidekiq
-  cd ~/Source/avant/credit-card-api && docker compose -p ccapi-frontbook-fee-validation up -d web sidekiq
-  cd ~/Source/avant/crm             && docker compose -p crm-frontbook-fee-validation  up -d web
-  cd ~/Source/avant/crm && docker compose -p crm-frontbook-fee-validation exec web sh -c 'cd /app && yarn webpack'
+  cd $ROOT/avant-basic     && docker compose -p $BASIC_PROJECT up -d web sidekiq
+  cd $ROOT/credit-card-api && docker compose -p $CCAPI_PROJECT up -d web sidekiq
+  cd $ROOT/crm             && docker compose -p $CRM_PROJECT  up -d web
+  cd $ROOT/crm && docker compose -p $CRM_PROJECT exec web sh -c 'cd /app && yarn webpack'
 
-basic :5001   ccapi :7100   CSP :4000/us/
+branch: $VALIDATION_BRANCH   basic :5001   ccapi :7100   CSP :4000/us/
 EOF
 fi

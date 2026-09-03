@@ -35,6 +35,29 @@ add worktrees for `avant-basic`, `credit-card-api` and `crm` under `$VALIDATION_
 (default `~/Source/avant/frontbook-validation`), restore the local patches, start all three stacks,
 and verify the things that fail silently.
 
+### Which branch
+
+`main` by default. Whether the fee launch ships before, after or alongside MP is not settled, so a
+Run must be reproducible against either trunk:
+
+```bash
+.claude/skills/test-frontbook-fee-launch/bootstrap.sh --branch mp     # or: VALIDATION_BRANCH=mp
+```
+
+- A non-`main` branch gets its **own** checkout root (`frontbook-validation-mp`), its own Compose
+  projects (`basic-frontbook-fee-validation-mp`) and therefore its own database volume. `main` keeps
+  the original unsuffixed names, so existing stacks and evidence are untouched.
+- **Only one branch can be up at a time** - both bind ports 5001/7100/4000. Bootstrap detects the
+  other branch's stack and tells you what to stop; `down` without `-v` keeps its database, so
+  switching back does not re-restore the dump.
+- The branch resolves **per repo**: `credit-card-api` has no `mp` branch, so it falls back to `main`
+  and bootstrap says so rather than failing. That fallback is usually correct and occasionally the
+  reason a Run behaves oddly, so it is written to `$VALIDATION_ROOT/.branch-provenance` and belongs
+  on the Run's evidence.
+- **Ask the user which branch if they did not say**, and never switch branches mid-Campaign: a Run
+  is only comparable to another Run from the same trunk. Read `.branch-provenance` to see where an
+  existing checkout actually sits - a directory that already existed was not moved by bootstrap.
+
 It needs one credential: `AVANT_TEMPLATES_API_KEY`, in `.env.local` at the repo root. This is the
 **production** TemplateFlow key. If the user does not have one, **ask them** - a teammate can send
 their `.env.local`. Do not go looking for it in Vault; it is not there.
