@@ -249,6 +249,11 @@ the same as reachable: nothing can select them until `param_to_id` lands.
 - **`main` vs `mp`:** the platform-wide `CLAUDE.md` says work from `mp`, but this launch is main-based -
   `dev.avant.com/apply` serves `basic` (main), Ocala blocks mp-based branches, and
   `lib/avant/pricing_strategies/service.rb` exists on `main` but not `mp`. Read `main` for this work.
+  **Superseded in part:** whether the launch ships before, after or alongside MP is still open, so
+  the harness takes the trunk as a parameter - `bootstrap.sh --branch mp`, ROADMAP 1.8. `main` is
+  still the default and still what has actually been walked; what changed is that `mp` is no longer
+  unreachable, and that the missing `service.rb` on `mp` is now a thing to expect rather than a
+  reason not to try.
 
 ## 10. The approved redline disagrees with itself on the foreign transaction row
 

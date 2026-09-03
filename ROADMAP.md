@@ -19,6 +19,26 @@ unchanged.
 The deliverable is evidence, not a green console. Product signs off on an artifact showing the fee
 amounts on a real rendered agreement.
 
+**The agreement is not the only surface.** CSRV-5300 asks for the fee disclosure to be verified at
+*application* time as well as at issuance, and for screenshots per surface, per strategy:
+
+| Surface | Where | Codes it applies to |
+| --- | --- | --- |
+| Cardmember agreement (CMA) | rendered letter, production TemplateFlow | all 28 |
+| `predecisioned_terms` | avant-basic, post-decision | all 28 - the **only** application-time surface an MLA code has |
+| avant-basic Schumer box | `/schumer_box/<uuid>` (dev-mp) | the 8 base codes + 8 predecessors |
+| Account-opening Schumer box | `/apply?product_type=credit_card&strategy=<uuid>` | same, once CSRV-5843 + CSRV-5844 deploy |
+| Contentful Schumer landing page | `/credit-card/landing/schumer/<uuid>` | same, once CSRV-5845 + CSRV-5846 ship |
+
+MLA codes have **no UUID**, so no `/schumer_box`, no `/apply?strategy=` and no landing page exists
+for them (FINDINGS #8: `param_to_id` carries the 8 base codes only). For an MLA Run the
+application-time evidence is `predecisioned_terms` plus the CMA, and that is the ticket's own
+instruction, not a shortcut.
+
+RPF is a fourth assertion, orthogonal to all of the above: `$25`, sourced entirely from Optimizely
+and never from Confetti (FINDINGS #5), so it needs its own per-Run check rather than a
+dependency-table tick.
+
 ### What every Run renders against
 
 **Production TemplateFlow**, picking up the **latest draft** of the **consolidated** cardmember
@@ -46,6 +66,10 @@ alone does not say which template it is a version of. No `git_sha_version` exist
 | Confetti `basic.pricing_strategy` (fees) | v17, dev and prd |
 | Confetti param-to-id / apr-caps (+8 UUIDs) | dev only; prd promotion deferred to CSRV-5823 |
 | Optimizely RPF audience + staging fee amounts | done, both environments |
+| CSRV-5843 (CAF account-opening Schumer box) | **In Progress** - gates the `/apply?strategy=` surface |
+| CSRV-5844 (avant-basic `react_index_url` bump to that CAF release) | **Created**, not started - gates it too |
+| CSRV-5845 (avant-redesign landing-page disclosure) | **In Progress** - gates the Contentful surface |
+| CSRV-5846 (Contentful: 8 new landing pages) | **Created**, not started - gates it too |
 
 **There is no `new_fee_structure` feature flag.** It was in CSRV-5299's description and never
 existed. Fee content is gated on the *presence* of Confetti-supplied variables (FINDINGS #9).
@@ -250,9 +274,75 @@ told it is unrunnable. It turned out to matter for the other 16 too - see FINDIN
         confirmed by reading the flattened text before touching them. The distinction is now in
         the script's docstring, since the output cannot show it
 
-### 1.7 Done when
+### 1.7 The application-time surfaces  (NOT STARTED)
+
+Everything above validates the CMA - one of the five surfaces CSRV-5300 asks for. Nothing in this
+repo has yet loaded a Schumer box or read `predecisioned_terms`, so four of the ticket's eight
+acceptance criteria are currently unaddressed. `apply_harness.py` already drives the apply flow, so
+the browser cost is mostly paid; what is missing is the assertions and the capture.
+
+- [ ] Assertion set for the Schumer box derived from the **same** `data/redline-assertions.json`,
+      not re-typed. The redline's two Schumer Boxes are two test cases of one site, tagged
+      `summary_box` - assert only the box whose annual-fee shape matches the Run (FINDINGS #10)
+  - [ ] Frontbook: `Up to $41` ceiling row and the `3% of each foreign transaction in U.S. dollars.`
+        row (Row A governs; Row B is an approved-doc typo)
+  - [ ] Backbook: `Up to $39` and a Foreign Transaction row reading `None`
+  - [ ] Every absence check proven to flip on the frontbook control, same `NO TEETH` rule as
+        `assert_cma_absence.py`
+- [ ] **`predecisioned_terms`** read and asserted per Run - late fees, FX fee, APR, annual fees.
+      This is the only application-time surface that exists for the 12 MLA codes, and the ticket
+      names it as the 3M33 verification path alongside the CMA
+- [ ] **avant-basic `/schumer_box/<uuid>`** on dev-mp for `0122`, `0123`, `3303`, and $39 / `None`
+      still on `0120`, `0121`, `3302`
+  - [ ] The ticket says dev-mp; the local stack defaults to `main`. Do not resolve this by
+        picking one - run it on whichever trunk the Run is pinned to (1.8) and stamp the branch
+        on the evidence
+- [ ] **Account-opening Schumer box** at `/apply?product_type=credit_card&strategy=<uuid>`, same six
+      codes. **Blocked on CSRV-5843 + CSRV-5844.** Capture a pre-deploy render anyway, so the flip
+      is evidenced rather than asserted from a single post-deploy state
+- [ ] **Contentful landing page** `/credit-card/landing/schumer/<uuid>` agrees with `/apply` for the
+      three frontbook codes, per runbook step 15.b. **Blocked on CSRV-5845 + CSRV-5846**
+- [ ] **RPF `$25`** asserted per Run, from a fresh process. It comes from Optimizely, is memoised per
+      `CreditCardAccount`, and the staging rule order can serve `$1.00/$21.40` for one hardcoded
+      product uuid (FINDINGS #5). `expected_rpf` is already a column in `data/run-matrix.csv` and
+      nothing reads it yet
+- [ ] A screenshot per surface per strategy, named by Run and surface, stored under
+      `evidence/run-<code>/` beside the html and pdf. The ticket asks for these attached, so the
+      artifact has to carry them rather than link a console transcript
+
+### 1.8 Branch flexibility - main or mp
+
+Whether the fee launch ships before, after or alongside MP is **not known**, and waiting for that
+answer would block everything. So the trunk under test is a parameter, not a constant. FINDINGS #9
+argued for `main` and that is still the default - it is what `dev.avant.com/apply` serves - but the
+harness no longer assumes it.
+
+- [x] `local-stack/branch-env.sh` derives everything branch-dependent from `VALIDATION_BRANCH`
+      (default `main`): the checkout root, and the three Compose project names. `main` stays
+      unsuffixed so existing stacks, volumes and evidence keep working
+- [x] `bootstrap.sh --branch mp` (or `VALIDATION_BRANCH=mp`), with its own checkout root and its
+      own database volume, so the two trunks cannot reshape each other's schema
+- [x] Refuses to start when the **other** branch's stack is up. They collide on ports
+      5001/7100/4000, not on project name, which Compose reports as an opaque bind failure
+- [x] The branch resolves **per repo**, since `credit-card-api` has no `mp`. A repo that falls back
+      to `main` is reported rather than failing, and the resolved branch + SHA per repo is written
+      to `$VALIDATION_ROOT/.branch-provenance`
+- [x] `restore.sh` reads the same resolver, so restoring against an `mp` checkout cannot bring up
+      the `main` stack
+- [ ] `.branch-provenance` read into the Run evidence, so an artifact says which trunk it proves.
+      Written but not yet consumed - a Run is currently branch-flexible and branch-silent
+- [ ] The `mp` path actually walked once end to end. Only `main` has been run. Unknowns to expect:
+      whether `lib/avant/pricing_strategies/service.rb` exists there (it does not, on the SHA
+      FINDINGS #9 checked), and whether the five local patches still apply cleanly
+- [ ] `APPLY_BASE` already redirects the browser walk at a remote host, which is how the ticket's
+      `dev-mp` surfaces get exercised without a local `mp` stack. Untested against basic-mp
+- [ ] A Run's identity includes its trunk: two Runs from different trunks are not comparable, and
+      the Campaign must not mix them. Enforce it in the Manifest (2.2) rather than by convention
+
+### 1.9 Done when
 
 - [ ] A teammate with only this repo runs the skill and validates `0122` and `0120` unaided
+- [ ] For one Pair, **all five surfaces** captured and asserted, not just the agreement
 
 ---
 
@@ -280,12 +370,16 @@ to support.
 
 - [x] Manifest schema committed (`data/manifest.schema.json`), so two agents cannot invent two shapes
 - [ ] Seeded from `data/run-matrix.csv` with a content hash; refuses to start if the matrix changed
+- [ ] Per-Run status is per **surface**, and `data/manifest.schema.json` extended to hold it - the
+      schema currently models a single render per Run
 - [ ] Read/write behind a lock, written through on every stage transition
 - [ ] Append-only Attempt log; status derived from the newest Attempt
 - [ ] Every handle captured by explicit id. **Audit for `.last` and remove every one**
 - [ ] `LocalCmaStub.revert!` in a finally-block, so a crashed Run leaves no pinned account
 - [ ] Database identity recorded on each Attempt
 - [ ] `template_version_uuid`, TemplateFlow host and repo SHAs stamped on every Attempt
+- [ ] `VALIDATION_BRANCH` and the per-repo resolved branches stamped too, from
+      `.branch-provenance`. A Campaign refuses to mix trunks; switching trunk starts a new one
 - [ ] Epoch derived from `template_version_uuid`, never from a fee amount
 - [ ] Attempts under a superseded version auto-marked stale and re-queued
 
@@ -311,13 +405,18 @@ to support.
 - [ ] Pair-first layout, headline verdict, evidence behind toggles
 - [ ] Shows template version, host, repo SHAs, `mla_forced` and Interventions per Run
 - [ ] Draft renders visibly distinguished from approved ones
+- [ ] One row per **surface** per Run, so a Run passing on the CMA and unrun on the Schumer box
+      cannot read as green. A blocked surface shows the ticket blocking it
+- [ ] Screenshots embedded per surface, since the ticket's sign-off is the screenshots
 - [ ] Regenerated after every Run, not only at the end
 
 ### 2.6 The Campaign
 
 - [ ] `0122` / `0120` Pair green end to end
 - [ ] CSRV-5300's four Pairs green
-- [ ] All 28 Runs attempted; every non-pass has a recorded reason
+- [ ] All 28 Runs attempted on every surface that exists for the code; every non-pass has a
+      recorded reason, and "surface blocked on CSRV-58xx" counts as recorded, not as passing
+- [ ] The four `/apply` and landing-page surfaces re-run after CSRV-5843..5846 deploy
 - [ ] Artifact published and handed to product
 
 ---
