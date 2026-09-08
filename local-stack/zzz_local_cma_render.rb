@@ -15,8 +15,10 @@
 #
 #   - a Run on credit_card_cardmember_agreement_1 reports $28/$39 for any pricing strategy,
 #     because _1 has none of the fee variables (FINDINGS #21)
-#   - a render without allow_unapproved gets the newest APPROVED version, which also has none of
-#     them (FINDINGS #22) - enforced in zzz_local_render_provenance.rb
+#   - before CSRV-5895, a render without allow_unapproved gets the newest APPROVED version, which
+#     also has none of them (FINDINGS #22). zzz_local_render_provenance.rb decides the correct flag
+#     per render, checked live against TemplateFlow rather than assumed (FINDINGS #34), since that
+#     ticket can land at any time and forcing the draft forever becomes its own silent failure
 #   - a document is only attributable to a version, not a template: 9658 has seven of them and
 #     only the v7 draft carries the new content (FINDINGS #22)
 #
@@ -198,7 +200,8 @@ module LocalCmaRender
         allow_unapproved:      probe[:allow_unapproved],
         templateflow_host:     probe[:templateflow_host],
         rendered_at:           probe[:rendered_at],
-        draft_render:          true,
+        render_mode:           probe[:render_mode],
+        draft_render:          probe[:allow_unapproved],
       }
     end
 
