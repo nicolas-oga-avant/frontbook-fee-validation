@@ -132,9 +132,14 @@ FINDINGS.md    36 platform findings - every failure mode, with evidence
 CONTEXT.md     glossary
 
 .claude/skills/test-frontbook-fee-launch/
-               SKILL.md - the runbook for one Run; bootstrap.sh - idempotent setup
-data/          run-matrix.csv (28 Runs, expected values, UUIDs), redline assertions, source sheet
-scripts/       apply_harness.py, the assert_* checkers, redline_text.py, extract_redline_assertions.py
+               SKILL.md - the index: shared steps, Surface selection, the Manifest; bootstrap.sh -
+               idempotent setup; surfaces/ - one file per Surface (cma.md is implemented, the other
+               four are not-yet-implemented/blocked stubs), the runbook's actual step-by-step detail
+data/          run-matrix.csv (28 Runs, expected values, UUIDs), manifest.schema.json, redline
+               assertions, source sheet
+scripts/       apply_harness.py, assert_cma_absence.py, assert_schumer_box.py, assert_value_table.py,
+               redline_text.py, extract_redline_assertions.py, manifest.py (seed/record/report
+               data/manifest.json - the per-Surface record across sessions)
 local-stack/   the untracked overrides that make the stack work, plus restore.sh
 evidence/      captured artifacts; baseline/ holds the verified pre-change 0122 render
 reference/     the L&C-approved redline (LGL-7960) - read the .docx, never a PDF export

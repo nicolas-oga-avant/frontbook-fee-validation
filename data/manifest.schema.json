@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Frontbook fee validation Manifest",
-  "description": "Durable record of every Run. A bare invocation of the skill advances this file. Written through on every stage transition, never only at the end.",
+  "description": "Durable record of every Run, per Surface. A bare invocation of the skill advances this file. Written through on every stage transition, never only at the end. One eyeball at data/manifest.json for a code shows every Surface's status - never just the CMA's.",
   "type": "object",
   "required": ["schema", "seeded_from", "database", "pairs"],
   "properties": {
-    "schema": {"const": 1},
+    "schema": {"const": 2},
     "seeded_from": {
       "type": "string",
       "description": "data/run-matrix.csv@<sha256>. The skill refuses to start if the matrix no longer hashes to this; a changed matrix requires a deliberate --reseed.",
@@ -45,7 +45,7 @@
     },
     "run": {
       "type": "object",
-      "required": ["code", "reachability", "expected", "attempts"],
+      "required": ["code", "reachability", "expected", "surfaces"],
       "properties": {
         "code": {"type": "string", "examples": ["0122", "3M33"]},
         "reachability": {
@@ -66,13 +66,42 @@
             "annual_fee_y2": {"type": "string"}
           }
         },
+        "surfaces": {
+          "type": "object",
+          "description": "One entry per Surface (CONTEXT.md), always all five - a Surface this code cannot reach yet still appears, as not_applicable/not_implemented/blocked, so a Run passing on the CMA and unrun on everything else cannot read as green (ROADMAP 2.5).",
+          "required": [
+            "cma",
+            "predecisioned_terms",
+            "schumer_box_basic",
+            "schumer_box_apply",
+            "schumer_box_landing"
+          ],
+          "properties": {
+            "cma": {"$ref": "#/$defs/surface"},
+            "predecisioned_terms": {"$ref": "#/$defs/surface"},
+            "schumer_box_basic": {"$ref": "#/$defs/surface"},
+            "schumer_box_apply": {"$ref": "#/$defs/surface"},
+            "schumer_box_landing": {"$ref": "#/$defs/surface"}
+          }
+        }
+      }
+    },
+    "surface": {
+      "type": "object",
+      "required": ["status", "attempts"],
+      "properties": {
         "status": {
-          "enum": ["pending", "in_progress", "halted", "passed", "failed", "blocked", "stale"],
-          "description": "DERIVED from the newest Attempt, never authored independently. halted = Mechanical Failure awaiting an agent. failed = Assertion Failure, which no agent may fix. stale = passed under a superseded Template Version and re-queued."
+          "enum": ["pending", "in_progress", "halted", "passed", "failed", "blocked", "not_applicable", "not_implemented", "stale"],
+          "description": "DERIVED from the newest Attempt where one exists, never authored independently. blocked/not_implemented/not_applicable carry no Attempt - nothing has run, and that is a fact worth recording, not an omission. halted = Mechanical Failure awaiting an agent. failed = Assertion Failure, which no agent may fix. stale = passed under a superseded Template Version and re-queued."
+        },
+        "blocked_on": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^CSRV-[0-9]+$"},
+          "description": "Only meaningful when status is blocked, e.g. schumer_box_apply -> [\"CSRV-5843\", \"CSRV-5844\"]."
         },
         "attempts": {
           "type": "array",
-          "description": "Append-only. An earlier Attempt is never overwritten: the evidence that made a result stale must survive alongside it.",
+          "description": "Append-only, this Surface's own history. An earlier Attempt is never overwritten. Empty when status is blocked/not_applicable/not_implemented.",
           "items": {"$ref": "#/$defs/attempt"}
         }
       }
@@ -85,12 +114,12 @@
         "started_at": {"type": "string", "format": "date-time"},
         "finished_at": {"type": ["string", "null"], "format": "date-time"},
         "stage": {
-          "enum": ["applied", "approved", "issued", "cma_rendered", "asserted"],
-          "description": "Last completed step. Also the resume point."
+          "enum": ["applied", "approved", "issued", "cma_rendered", "read", "asserted"],
+          "description": "Last completed step for THIS Surface. Also the resume point. cma uses the full applied/approved/issued/cma_rendered/asserted path; predecisioned_terms and the Schumer/landing Surfaces stop at read (no issuance, no render) before asserted."
         },
         "handles": {
           "type": "object",
-          "description": "Captured by explicit id at creation. NEVER resolved later by recency - see AGENTS.md rule 1.",
+          "description": "Captured by explicit id at creation. NEVER resolved later by recency - see AGENTS.md rule 1. cma and predecisioned_terms share the same application_id - see SKILL.md 'Choosing which Surface(s) to run'.",
           "properties": {
             "application_id": {"type": ["integer", "null"]},
             "cca_id": {"type": ["integer", "null"]},
@@ -103,7 +132,7 @@
           "required": ["templateflow_host", "template_version"],
           "properties": {
             "templateflow_host": {"type": "string"},
-            "template_version": {"type": ["string", "null"], "description": "git_sha_version of the rendered CMA template. THE epoch signal. Never inferred from a fee amount."},
+            "template_version": {"type": ["string", "null"], "description": "git_sha_version of the rendered CMA template. THE epoch signal. Never inferred from a fee amount. Null for Surfaces that render nothing."},
             "repo_shas": {"type": "object", "additionalProperties": {"type": "string"}},
             "mla_forced": {"type": "boolean"}
           }
@@ -115,7 +144,7 @@
             "required": ["layer", "name", "expected", "actual", "passed"],
             "properties": {
               "layer": {"enum": ["value_table", "redline"]},
-              "point": {"enum": ["confetti", "decisioned_application", "cma_inputs", "rendered_cma", "csp_label"]},
+              "point": {"enum": ["confetti", "decisioned_application", "cma_inputs", "rendered_cma", "csp_label", "predecisioned_terms", "schumer_box"]},
               "name": {"type": "string"},
               "expected": {},
               "actual": {},
@@ -137,7 +166,7 @@
             "diagnosis": {"type": "string", "description": "The matching FINDINGS.md entry, quoted, by number."},
             "finding_ref": {"type": ["integer", "null"]},
             "suggested_action": {"type": "string"},
-            "resume_from": {"enum": ["applied", "approved", "issued", "cma_rendered", "asserted"]}
+            "resume_from": {"enum": ["applied", "approved", "issued", "cma_rendered", "read", "asserted"]}
           }
         },
         "interventions": {
@@ -153,7 +182,7 @@
             }
           }
         },
-        "evidence_dir": {"type": "string", "examples": ["evidence/runs/0120-_gt_-0122/0122/attempt-1/"]}
+        "evidence_dir": {"type": "string", "examples": ["evidence/run-0122/"]}
       }
     }
   }

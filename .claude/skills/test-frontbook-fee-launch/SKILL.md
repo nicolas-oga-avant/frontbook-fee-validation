@@ -1,13 +1,13 @@
 ---
 name: test-frontbook-fee-launch
-description: Runs one end-to-end frontbook fee launch validation locally for a given pricing strategy code - sets up the stack from nothing, drives a card application to approval in the browser, issues the card, renders the cardmember agreement, and asserts the fee content. Use when asked to "validate strategy 0122", "test the frontbook fee launch", "run the fee validation for CSRV-5300/5301/5302/5303", or to check that a backbook code still renders $28/$39 with no foreign transaction fee. This is the LLM-driven version: it drives the browser through browser-harness. Renders go against production TemplateFlow in preview mode, picking up the latest draft of the template.
+description: Runs one end-to-end frontbook fee launch validation locally for a given pricing strategy code - sets up the stack from nothing, drives a card application to approval in the browser, issues the card, renders the cardmember agreement, and asserts the fee content. By default it runs every Surface implemented for that code (today, that is the cardmember agreement); pass a Surface name to run just one, e.g. "just check the cma surface for 0122" or "run predecisioned_terms for 3M33". Use when asked to "validate strategy 0122", "test the frontbook fee launch", "run the fee validation for CSRV-5300/5301/5302/5303", to check that a backbook code still renders $28/$39 with no foreign transaction fee, or to check one specific surface (cma, predecisioned_terms, schumer_box_basic, schumer_box_apply, schumer_box_landing). This is the LLM-driven version: it drives the browser through browser-harness. Renders go against production TemplateFlow in preview mode, picking up the latest draft of the template.
 ---
 
 # Frontbook fee launch validation - one Run
 
-Proves that a card issued under a given pricing strategy renders a cardmember agreement with the
-right fees. Epic CSRV-4119: late fee $28/$39 -> $30/$41, plus a new 3% foreign transaction fee, on
-frontbook codes only.
+Proves that a card issued under a given pricing strategy shows the right fees on every Surface
+CSRV-5300 asks for, not only the cardmember agreement. Epic CSRV-4119: late fee $28/$39 -> $30/$41,
+plus a new 3% foreign transaction fee, on frontbook codes only.
 
 **You drive this.** Setup is scripted; the browser walk is yours, through browser-harness. A
 deterministic replacement for the browser phase is planned - until then expect this to cost tokens.
@@ -117,346 +117,106 @@ read as unconfigured. Confirm this before concluding a Run failed.
 either: `cma_pricing_strategy_config` falls back to `code_to_mla.key(identifier)`, so an MLA
 account is priced off the base code's entry.
 
-## Step 3 - Apply, in the browser
+## Choosing which Surface(s) to run
 
-Load `scripts/apply_harness.py` into browser-harness. Every workaround in it exists because of an
-observed failure; read its module docstring first.
+`ROADMAP.md` section 1.7 names five **Surfaces** - the places the fee content must be checked for
+one code. A "Run" is not just the agreement; it is every Surface that applies to the code, checked
+or explicitly reported as not-yet-checked.
 
-```
-http://localhost:5001/apply?product_type=credit_card&strategy=<UUID>
-```
+| Surface key | What it is | Applies to | Status | Full procedure |
+| --- | --- | --- | --- | --- |
+| `cma` | Rendered cardmember agreement, production TemplateFlow | all 28 codes | **Implemented** | `surfaces/cma.md` |
+| `predecisioned_terms` | avant-basic, post-decision, before issuance | all 28 codes - the only surface an MLA code has besides the CMA | **Implemented** - discloses neither launch fee (FINDINGS #34) | `surfaces/predecisioned_terms.md` |
+| `schumer_box_basic` | `/schumer_box/<uuid>` on dev-mp | the 8 base codes + 8 predecessors (no UUID for MLA codes) | Checker implemented, **unreachable on `main`** (FINDINGS #35) | `surfaces/schumer_box_basic.md` |
+| `schumer_box_apply` | `/apply?product_type=credit_card&strategy=<uuid>` | same 16 | **Implemented**, expected to fail until CSRV-5843 + CSRV-5844 ship | `surfaces/schumer_box_apply.md` |
+| `schumer_box_landing` | `/credit-card/landing/schumer/<uuid>` | same 16 | **Blocked** on CSRV-5845 + CSRV-5846 | `surfaces/schumer_box_landing.md` |
 
-`apply_plan(code)` returns that URL together with the TU last name the code needs, which is the only
-safe way to reach an MLA code - the two halves must agree.
+Each file in the `surfaces/` column is self-contained for that Surface: its own steps (or its own
+explicit refusal, if not yet implemented or blocked). Load only the file(s) for the Surface(s) you
+are about to run - this file stays the index, not a copy of all five.
 
-An unrecognised UUID redirects to `strategy_param_error_path`. That is a clean, fast failure meaning
-the UUID is not in the param map - not a bug in your walk.
+### The Manifest is what makes this additive across sessions
 
-Use a fresh browser context per Run (`new_incognito_tab()`), so one Run's session cannot leak into
-another. Keep admin and CSP work in the default profile: an incognito context has no Okta session,
-so it cannot reach anything behind SSO.
-
-Let `AUTOFILL PERSONAL STAGE` generate the identity. It produces a fresh randomized one per Run, so
-Runs cannot collide on a duplicate customer, and the standard dev TransUnion stub approves it. **Do
-not reach for the `TST_00xx` mock catalogue** - it has no approved-card case; every `Card`-labelled
-case is a decline or a risk scenario (`docs/mock-test-cases.md`). `TST_0001` is the fallback only if
-the default stub ever stops approving.
-
-| Stage | What to do |
-| --- | --- |
-| `#/personal` | `autofill_stage()`; **then** `set_tu_scenario(plan["tu_last_name"])` - autofill overwrites the last name, and both TU mocks key off it; `fix_autofill_phone()`; `tick_consents_dom()` |
-| `#/personal_continued` | `autofill_stage()`; **`fix_autofill_address()`** - overwrite the whole address; `tick_consents_dom()` (an extra IL-specific consent appears) |
-| `#/rates_terms` | `autofill_stage()`; `tick_consents_dom()` - `creditHardPullConsent` is the one that blocks approval |
-| `#/password` | `set_input("customer.password", ...)` and `customer.passwordConfirmation` |
-| after `CREATE PASSWORD` | redirects to `https://avant.staging-app.avant-test.com/verify/<app_uuid>`, which **this stack does not run**. The walk ends here; capture the app uuid from that URL |
-| approval | **server-side, in the console**: `CustomerApplication.find_by!(uuid: ...).product.approve!` |
-
-There is no dashboard step. The customer dashboard is a separate app that the local stack does not
-run, so `dev tools -> Approve Product and Skip Ver` cannot be performed - and that endpoint is
-broken on `main` regardless (FINDINGS #26, #32).
-
-Six browser traps, all silent, all handled by the harness helpers:
-
-1. **Coordinate clicks do nothing on this flow.** A CDP mouse event on the submit button or a
-   consent checkbox reports success and has no effect - no error, no validation copy, only
-   `check_session_timeout` on the wire. Use `element.click()`: that is what `submit_stage()`,
-   `tick_consents_dom()` and `autofill_stage()` now do (FINDINGS #31).
-2. Clicks below the fold do nothing - the accessibility box model returns *page* coordinates.
-3. **`scrollIntoView` does not take effect inside the same `js()` eval.** Scroll and measure in
-   separate calls. This is the single most important rule in the harness.
-4. Consent checkboxes are not HTML-`required`, so `checkValidity()` returns true while React refuses
-   to advance.
-5. `AUTOFILL` emits an invalid phone number, an internally inconsistent address, and a last name
-   that undoes `set_tu_scenario`.
-6. The submit button's label differs on every stage, so select it by `type=submit`, never by text.
-
-If a stage will not advance and shows no error: blur every input, then re-read the page text. That
-surfaces the block.
-
-Confirm a submit actually happened rather than trusting the absence of an error. On `#/rates_terms`
-these three requests all return 200:
-
-```
-/api/customer_applications/<id>/save_field
-/api/customer_applications/<id>/send_product_details
-/api/customer_applications/<id>/submit_page
-```
-
-If only `google` / `doubleclick` / `facebook` requests fire, the form never submitted.
-
-**Capture the `application_id` explicitly, now.** Never look it up later by recency - see Step 4.
-
-## Step 4 - Issue and render, in the console
-
-Run against basic:
+`data/manifest.json` (schema: `data/manifest.schema.json`, tooling: `scripts/manifest.py`) is the
+per-code, per-Surface record - the thing that makes "run `cma` today, run `predecisioned_terms`
+next week" combine into one picture with nothing more than reading a file, rather than an agent
+reconstructing what happened by listing `evidence/`.
 
 ```bash
-cd "$VALIDATION_ROOT/avant-basic"
-docker compose -p basic-frontbook-fee-validation exec -T web bundle exec rails runner /usr/src/app/tmp/<script>.rb
+python3 scripts/manifest.py seed              # once, the first time this repo's Manifest is used
+python3 scripts/manifest.py report <CODE>     # before starting: what's already known about this code
 ```
 
-`rails runner` is not a console: it has no Optimizely client, so **start every script with
-`OptimizelyInitializer.setup!`** or you get `undefined method 'optimizely_client'` from somewhere
-unrelated-looking.
-
-```ruby
-OptimizelyInitializer.setup!
-
-# On an MLA Run, first prove the forcing took. It is silent when it does not: the account simply
-# opens under the base code and the Run reports frontbook amounts for a code nobody asked about.
-LocalMlaStub.verify!(<application_id>, expected_code: "<CODE>")
-
-cca = CreditCardAccount.find(<cca_id>)
-cca.issue!                       # => true. Real onboarding, servicing account, agreement log
-LocalCmaStub.prepare!(cca.id)    # Fiserv-only fields, and forces the consolidated CMA
-
-# Sanity, before trusting anything downstream:
-raise "wrong strategy" unless cca.current_cardholder_pricing_strategy_identifier.to_s == "<CODE>"
-```
-
-`LocalCmaStub` (`local-stack/zzz_local_cma_stub.rb`) refuses to run on an unissued account and
-cross-checks the pricing strategy against the decision path tag - read its header. On an MLA Run the
-tag holds the **base** code and the account holds the M code; the cross-check maps through
-`code_to_mla` rather than comparing them raw. `revert!` belongs
-in a finally-block, not on the happy path, so a crashed Run leaves no pinned account.
-
-`prepare!` also tags the account `needs_consolidated_cma`, and `verify!` raises unless the resolved
-template is `:credit_card_cardmember_agreement_consolidated`. That check is not ceremony: the fee
-variables exist only on the consolidated agreement, and `credit_card_cardmember_agreement_1` still
-hardcodes `$28`/`$39`, so a Run that renders `_1` reports backbook amounts for **any** pricing
-strategy and nothing errors (FINDINGS #21). If it raises, check the boot log for
-`[local] LocalConsolidatedCma` - the tag does nothing without
-`zzz_local_consolidated_cma.rb` loaded.
-
-Note the ordering with `OptimizelyInitializer.setup!` above: with a live Optimizely client the real
-`consolidated_cma_enabled?` may well return false, since the flag is not on for a local box. The
-per-account override short-circuits ahead of it, so the tag wins either way.
-
-**Never use `.last` to find the agreement log.** An account accumulates several, and picking the
-wrong one silently validates a different document. Capture the id from `issue!`.
-
-### Rendering: only one path works
-
-Three entry points exist. Two fail locally for reasons that never mention the agreement:
-
-| Path | What happens |
-| --- | --- |
-| `product.send_email!(:credit_card_product_overview, ...)` | 422 `Missing Variables: first_name`. It dies rendering the *email subject*, before the attachment |
-| `interface.csp_requested_cardmember_agreement_log` | `DataSourceBuildError: annual_membership_fee_amount must be a float`. It regenerates inputs, which need a product decision a locally-approved application does not have |
-| `CardmemberAgreementLetter.render_pdf` on a log with **stored** `template_variables` | **works** |
-
-Use `LocalCmaRender` (`local-stack/zzz_local_cma_render.rb`) rather than calling the letter
-directly. It performs that render and asserts the three things the output cannot tell you apart:
-which template resolved, which *version* of it TemplateFlow served, and whether the render was a
-non-persisting preview.
-
-```ruby
-src = CardmemberAgreementLog.find(<issuance_log_id>)   # the id captured from issue!
-log = CardmemberAgreementLog.create!(
-  credit_card_account: cca,
-  reason_type: CardmemberAgreementLog::CSP_REQUESTED,
-  template_variables: src.template_variables,
-)
-
-prov = LocalCmaRender.call!(cca.id, log_id: log.id, expected_code: "<CODE>",
-                            out_dir: "/usr/src/app/tmp/run-<CODE>")
-puts JSON.pretty_generate(prov)
-```
-
-It refuses rather than producing weak evidence when:
-
-- the account is not priced at `expected_code`
-- the resolved template is not `credit_card_cardmember_agreement_consolidated`, or that name no
-  longer points at `5d5b0b5c-...` (template 9658)
-- the log already holds a document - `render_pdf` would return the stored one and send no request,
-  so the version id would be a previous render's
-- the version the log records disagrees with the one the render actually used
-- nothing reached TemplateFlow at all
-
-It writes `<base>.html`, `<base>.pdf` and `<base>.provenance.json` into `out_dir` and returns the
-provenance. Copy all three out with `docker cp` into `evidence/run-<CODE>/`.
-
-One render per log. To re-render, create another log from the same `template_variables`.
-
-Do **not** use the CSP "Download CMA" button or the `.eml`. That route pipes `wkhtmltopdf` inside an
-emulated container and hangs. basic already rendered the identical PDF natively.
-
-### Where the render goes, and why it is a draft
-
-`AVANT_TEMPLATES_HOST` points at **production** TemplateFlow, and the template under test is the
-latest draft. Nothing needs patching: a local stack already renders unapproved drafts in preview
-mode, and preview is what keeps this safe.
-
-Two flags do that work, and both default to `!Avant::Env.acts_as_prod?`
-(`avant-basic/lib/avant/templateflow/create_document.rb:18-19`):
-
-| Flag | Off means |
-| --- | --- |
-| `preview` | drafts stop rendering **and** documents start persisting to production |
-| `allow_unapproved` | TemplateFlow serves the newest *approved* version, which has no fee variables and hardcodes `$28`/`$39` (FINDINGS #22) - a frontbook Run then reports backbook amounts and nothing errors |
-
-`zzz_local_render_provenance.rb` refuses a cardmember agreement render unless both are on, before
-the request is sent, so neither can happen silently - hard rule 3 in `AGENTS.md`, and the argument
-is in `docs/adr/0002-render-drafts-against-production-templateflow.md`. It is scoped to the three
-CMA templates: loan contracts render with `preview: false` legitimately.
-
-Provenance is the `template_version_uuid`, and the letter path does persist it - on
-`cardmember_agreement_logs.template_version_id` (FINDINGS #28, since corrected). `LocalCmaRender`
-reads it back and cross-checks it against what the probe saw on the wire. There is no
-`git_sha_version` yet. `all_version_uuids` comes back newest-first, so the version in use is its
-first entry - useful for saying how far ahead of the approved version the draft is.
-
-## Step 5 - Assert
-
-Two layers. Run both.
-
-**Layer 1 - the value table.** Five points, each catching a different failure, plus RPF:
-
-| Point | Assert | Catches |
-| --- | --- | --- |
-| Confetti | the UUID resolves; fees and APR cap present | stale config, before the Run is wasted |
-| Decisioned application | `expected_max_apr`, annual fee y1/y2 | a missing APR cap, which shows up as 29.99% where you expected 35.99% |
-| Agreement inputs | the three `cma_*` integers | the strategy-to-numbers boundary, with no render needed |
-| Rendered agreement | the five template sites | that the inputs reached the document |
-| CSP labels | match the agreement | that the two cannot disagree |
-| RPF | `$25`, from a fresh process | a stale Optimizely datafile (FINDINGS #5) |
-
-Four of the six can only be read from inside the stack. Collect them in the same runner script
-that issued and rendered, then assert them outside it:
-
-```ruby
-LocalRunObservations.collect!(account: cca.id, application: <application_id>, code: "<CODE>",
-                              rendered_html: "evidence/run-<CODE>/cma_<CODE>_log<N>.html")
-# => /usr/src/app/tmp/observations_<CODE>.json
-```
+After finishing a Surface - pass, fail, or a documented block/non-implementation - record it before
+moving on:
 
 ```bash
-docker compose -p "$BASIC_PROJECT" cp web:/usr/src/app/tmp/observations_0122.json \
-    evidence/run-0122/observations.json
-python3 scripts/assert_value_table.py 0122 --observations evidence/run-0122/observations.json
+python3 scripts/manifest.py record 0122 cma passed --attempt-json '{
+  "stage": "asserted",
+  "provenance": {"templateflow_host": "...", "template_version": "<from LocalCmaRender>"},
+  "evidence_dir": "evidence/run-0122/",
+  "assertions": [...]
+}'
+python3 scripts/manifest.py record 3M33 predecisioned_terms passed --attempt-json '{"stage": "asserted"}'
+python3 scripts/manifest.py record 0122 schumer_box_apply failed --attempt-json '{"stage": "asserted"}'
+python3 scripts/manifest.py record 0122 schumer_box_basic blocked --blocked-on "dev-mp-only, see FINDINGS #35"
+python3 scripts/manifest.py record 0122 schumer_box_landing blocked --blocked-on CSRV-5845,CSRV-5846
 ```
 
-Confetti is read live; every other point comes from the observations file. A point with no
-observation reports `NOT CAPTURED` and fails the Run - an uncaptured point and a passing one look
-identical in a summary, which is the whole reason it is not a skip.
+`record` touches only the one `(code, surface)` cell named - every other Surface's status and
+Attempt history is left exactly as it was. That is the whole mechanism: nothing about running
+`predecisioned_terms` next week needs to know what `cma` did this week, because it never touched
+`cma`'s cell. **Never hand-edit `data/manifest.json`** - always go through `record`, or the
+append-only Attempt rule (AGENTS.md rule 1) can be silently violated by a slipped edit.
 
-Two expectations in there look wrong and are not. `predecisioned_terms[:maximum_late_fee]` is
-asserted to be `35.0`, the policy constant: that surface carries no fee-launch amount at all, and
-no FX fee key (FINDINGS #34). And a monthly-fee strategy's year-two figure arrives under
-`monthly_membership_fee_year_two` rather than the annual key, so either satisfies the check.
+**Invocation:**
 
-**Absence is a positive assertion.** For a backbook code the foreign transaction paragraph must
-**not** render and the summary row must read `None`. "I did not find it" is a pass only if the check
-would have found it, so run it against a frontbook render as a control in the same pass:
+- **Bare** ("validate 0122", "test the frontbook fee launch for 3M33"): read
+  `python3 scripts/manifest.py report 0122` first, then run every Surface that applies to the code
+  **and** is Implemented **and** is not already `passed` under the current Template Version. Record
+  the ones that do not apply, are not yet implemented, or are blocked - by name and, if blocked, by
+  ticket - via `record ... not_applicable|not_implemented|blocked` rather than leaving them at
+  `pending`. Never silently narrow a full validation down to just the CMA.
+- **Scoped** ("just check the cma surface for 0122", "run predecisioned_terms for 3M33", or
+  `--surface cma,predecisioned_terms`): run only the named Surface(s) for that code, and record only
+  those cells. If a named Surface does not apply to the code, is not yet implemented, or is blocked,
+  say so plainly, record that status, and do not attempt it - do not improvise steps for a Surface
+  this file has not specified. That is exactly the trap hard rule 5 in `AGENTS.md` warns about: a
+  plausible-looking value for a Surface nobody has actually verified is worse than an explicit
+  "not run".
+- Steps 1-2 above (set up, pick the code) run once regardless of which Surface(s) are selected -
+  they are shared prerequisites, not part of any one Surface.
+- `cma` and `predecisioned_terms` both need the **same** applied application - `surfaces/cma.md`
+  Step 3. Running both together means walking that step once and branching after decisioning, never
+  applying twice for one code. The three Schumer/landing Surfaces need no application at all: they
+  are read directly off the code's UUID from the matrix row, once implemented.
+
+## Assembling the report across Surfaces
+
+When more than one Surface ran - in this session, in an earlier one, or both - do not hand-combine
+a summary. The Manifest already has it, because `record` only ever touched the one cell each
+Surface named:
 
 ```bash
-python3 scripts/assert_cma_absence.py evidence/run-0120/cma_0120_log5.html \
-    --control evidence/run-0122/cma_0122_rerender.html
+python3 scripts/manifest.py report <CODE>
 ```
 
-Every check must pass on the backbook document **and** fail on the control. One that passes on both
-is reported as `NO TEETH` and is worth nothing.
+That is the report: one line per Surface, PASS/FAIL with its Attempt count, **not yet implemented**,
+or **blocked** with the ticket(s). Build the user-facing writeup around that output, not instead of
+it:
 
-**Layer 2 - the redline.** `data/redline-assertions.json` holds seven assertions derived from the
-L&C-approved document, with fee amounts parameterised. Substitute from the matrix row and compare
-full sentences.
-
-**The `3%` trap:** the only `3%` in a backbook agreement is the cash advance fee - "the greater of
-$10 or 3%". A naive `'3%' in text` check passes for entirely the wrong reason. Match whole
-sentences.
-
-**Compare fee content, never bytes.** `evidence/baseline/cma_0122_local.html` was rendered against a
-different TemplateFlow instance and legitimately differs in unrelated ways.
-
-## Step 5b - The application-time surfaces
-
-The agreement is one of the surfaces the ticket asks for. The other three are Schumer boxes, all
-keyed to a strategy uuid, so **an MLA code reaches none of them** - its application-time evidence
-is `predecisioned_terms` plus the agreement (FINDINGS #8), and both `surface_urls()` and
-`assert_schumer_box.py` refuse an M code rather than passing while asserting nothing.
-
-```python
-surface_urls("0122")                     # surface -> (url, what blocks it, if anything)
-capture_surface("0122", "schumer_landing")  # html + png into evidence/run-0122/, indexed in surfaces.json
-```
-
-**The account-opening box is not one of those URLs.** It is a section of the `personal_continued`
-stage - the same stage that returns `predecisioned_terms` - so it exists only part-way through a
-walk. Reach it, then capture in place:
-
-```python
-goto_url(apply_url("0122")); wait_for_load(); wait(8)
-autofill_stage(); set_tu_scenario("approved"); fix_autofill_phone(); tick_consents_dom()
-submit_stage(); wait(14); wait_for_load()
-assert stage() == "personal_continued"
-capture_surface("0122", "schumer_account_opening", navigate=False, element="table.schumer-box")
-```
-
-Both arguments matter. Without `navigate=False` the capture reloads the apply URL and
-screenshots the **first** stage. Without `element` the screenshot clips: the box sits in a 240px
-scroll window over a 740px table, and what falls outside is the fee rows. A second Run needs
-`new_incognito_tab()` first - the previous applicant's session redirects `/apply` to `/home`.
-
-```bash
-python3 scripts/assert_schumer_box.py evidence/run-0120/schumer_basic_0120.html \
-    --code 0120 --control evidence/run-0122/schumer_basic_0122.html
-```
-
-Both artifacts, every time: the html is what the checker reads, the png is what product signs off
-on. Screenshots are named by Run and surface and live beside the render.
-
-**Read FINDINGS #35 before capturing any of them.** Every Schumer box hardcodes `Up to $39` and
-`Foreign Transaction: None` today, so a frontbook capture is **expected to fail** both fee
-assertions. CSRV-5843 owns the in-flow box and CSRV-5845 the landing pages; both are In Progress,
-so these checks pass the day they ship and fail honestly until then. Report it as a result, never
-retry the capture.
-
-The checker says which kind of failure it is. Its `CONTROL annual fee row` check is
-strategy-driven today, so a run where **only the two launch rows fail** is the pending disclosure,
-and a run where the control or the `box rendered` guard fails is a broken capture - a screenshot of
-the wrong stage fails the fee rows too. Confirmed on `0122` (`$0`) and `9004` (`$125`).
-
-The standalone `/schumer_box/<uuid>` page exists only on `mp`, and the landing page is blocked on
-CSRV-5845 + CSRV-5846. Capture them anyway once reachable, so the flip is evidenced by a before and
-an after rather than asserted from one post-deploy state.
-
-## Step 6 - Report
-
-Give the user, for the code under test:
-
-- expected vs actual for every assertion, and a verdict
-- the pricing strategy actually resolved, read from
-  `cca.current_cardholder_pricing_strategy_identifier` - the CSP never displays it
-- the TemplateFlow host, the `template_version_uuid` from the render response, and the fact that it
-  was a draft preview - a render with no provenance cannot be attributed to a version
-- the evidence: URLs visited, the console transcript, the rendered agreement
-
-Evidence is the deliverable, not a side effect - product signs off on the artifact. Capture, per
-step: the URL navigated to, the values filled, the dev helper clicked, the console command and its
-output, and the artifacts produced. Save the rendered HTML under `evidence/`.
-
-### The baseline
-
-`evidence/baseline/cma_0122_local.{html,pdf}` is the verified pre-change render for `0122`: $28/$39,
-no FX fee. That is **correct** for its Epoch. Once the new template version is live, the identical
-Run should flip to $30/$41/3%.
-
-## Known blockers - report these, do not work around them
-
-- **An MLA Run's classification is forged**, and the report says so. `LocalMlaStub` supplies a
-  positive TransUnion MLA report; everything downstream of it - the `code_to_mla` mapping, the
-  render variables, the template - runs unpatched. Stamp `mla_forced: true` on the Attempt.
-- **You are validating a draft.** Say so in the report. A draft render proves the pending content is
-  correct; it is not evidence that customers receive it today.
-- **No product decision** exists on a locally-approved application, so `cma_apr_margin_decimal` is
-  nil. Fees are unaffected, but do not trust the APR margin on a variable-rate strategy. Do not
-  fabricate a decision to silence it.
-- **CSP may show no Late Fee Structure** depending on the CRM branch. Check
-  `grep -rn lateFeeStructure src/` before reporting its absence as a defect.
+- The overall verdict for the code is the verdict of its `cma` Surface **plus** the full per-Surface
+  breakdown - never a bare PASS that quietly means "the agreement was fine". ROADMAP.md 2.5 states
+  the artifact-level version of this rule: a Run passing on the CMA and unrun on everything else must
+  not read as green.
+- If `report` shows a Surface already `passed` under the current Template Version from an earlier
+  session, say so and do not re-run it - that is the whole point of recording it durably.
+- Note when `cma` and `predecisioned_terms` shared one applied application (see "Choosing which
+  Surface(s) to run" above) rather than leaving it implicit that two Surfaces shared one apply.
 
 ## If something breaks
 
-`FINDINGS.md` in the repo root documents 20 failure modes with symptom, cause, and the file and line
+`FINDINGS.md` in the repo root documents 36 failure modes with symptom, cause, and the file and line
 that proves each. Check it before debugging from scratch - most of what goes wrong here has already
 gone wrong once and been written up.
 

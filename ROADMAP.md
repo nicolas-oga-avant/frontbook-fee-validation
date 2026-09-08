@@ -316,6 +316,24 @@ Everything above validates the CMA - one of the five surfaces CSRV-5300 asks for
 the capture now exist; what is missing is a Run that walks them, and two of the three surfaces are
 still blocked on their own tickets.
 
+- [x] The skill takes a Surface, not just a code. `.claude/skills/test-frontbook-fee-launch/SKILL.md`
+      now names the five Surfaces explicitly (`cma`, `predecisioned_terms`, `schumer_box_basic`,
+      `schumer_box_apply`, `schumer_box_landing`) with a status each, and defines invocation: a bare
+      Run attempts every Surface that applies to the code **and** is implemented, reporting the rest
+      as not-applicable / not-yet-implemented / blocked-on-ticket rather than omitting them; a scoped
+      Run (`--surface <key>[,<key>...]`, or naming the Surface in the request) runs only that one and
+      refuses to improvise steps for a Surface the file has not specified
+  - [x] `cma` and `predecisioned_terms` share one applied application - the runbook says to walk
+        Step 3 once and branch after decisioning, not to apply twice for one code
+  - [x] The three Schumer/landing Surfaces need no application at all - documented as read directly
+        off the code's UUID, once each is implemented
+  - [x] `CONTEXT.md` gained a `Surface` entry so the vocabulary has one owner, and `Run`'s definition
+        now says "across every Surface that applies to it" instead of implying the agreement alone
+  - [x] Reporting is no longer per-session: every Surface's result (or its not-implemented/blocked
+        status) is recorded into the real Manifest via `scripts/manifest.py record`, and the combined
+        report for a code is `scripts/manifest.py report <code>` - see 2.2, pulled forward from
+        Phase 2 rather than left as a documentation-only convention
+
 **The two frontbook rows are expected to fail, and that is the point.** CSRV-5843 (in-flow box)
 and CSRV-5845 (landing pages) each own one surface and neither has shipped, so an assertion written
 today fails today and passes the moment they do. Developing them now is what makes the flip
@@ -349,6 +367,9 @@ hardcodes `Up to $39` and `Foreign Transaction: None` for every strategy. A fron
       is recorded on every Run
   - [ ] Product question, not a harness gap: if the applicant is meant to see the new late fee
         before they have an account, this surface cannot currently show it
+  - [x] This is the only application-time surface that exists for the 12 MLA codes - the ticket
+        names it as the 3M33 verification path alongside the CMA, which is why its gap (FINDINGS
+        #34) is recorded rather than left as a silent NOT CAPTURED
 - [ ] **avant-basic `/schumer_box/<uuid>`** on dev-mp for `0122`, `0123`, `3303`, and $39 / `None`
       still on `0120`, `0121`, `3302`
   - [x] ~~run it on whichever trunk the Run is pinned to and stamp the branch on the evidence~~
@@ -474,11 +495,31 @@ to support.
 ### 2.2 Manifest and provenance
 
 - [x] Manifest schema committed (`data/manifest.schema.json`), so two agents cannot invent two shapes
-- [ ] Seeded from `data/run-matrix.csv` with a content hash; refuses to start if the matrix changed
-- [ ] Per-Run status is per **surface**, and `data/manifest.schema.json` extended to hold it - the
-      schema currently models a single render per Run
-- [ ] Read/write behind a lock, written through on every stage transition
-- [ ] Append-only Attempt log; status derived from the newest Attempt
+- [x] Seeded from `data/run-matrix.csv` with a content hash; refuses to start if the matrix changed.
+      Pulled forward from Phase 2 into Phase 1 use: `scripts/manifest.py seed` builds
+      `data/manifest.json` stamped `seeded_from: data/run-matrix.csv@<sha256>`; `record` refuses
+      (`_check_seeded_from`) once the file on disk no longer hashes to it
+- [x] Per-Run status is per **surface**, and `data/manifest.schema.json` extended to hold it. Schema
+      bumped to `schema: 2`: `run.surfaces` is now an object with all five Surface keys always
+      present (`cma`, `predecisioned_terms`, `schumer_box_basic`, `schumer_box_apply`,
+      `schumer_box_landing`), each with its own `status` and its own append-only `attempts[]` - not
+      one render modeled per Run. `.claude/skills/test-frontbook-fee-launch/SKILL.md` now reads and
+      writes it via `scripts/manifest.py`, so running one Surface today and a different one for the
+      same code in a later session combines with nothing more than `manifest.py report <code>` -
+      no evidence-directory eyeballing to reconstruct what happened
+  - [x] Verified end to end against a scratch copy of the repo: seed, record three different
+        Surfaces for the same code across separate invocations (`passed` with assertions,
+        `not_implemented`, `blocked` with tickets), and `report` shows all three correctly without
+        any of the three knowing about the others
+- [ ] Read/write behind a lock, written through on every stage transition. `scripts/manifest.py`
+      writes through today but takes no lock - fine for one agent at a time, a real gap once 2.4's
+      concurrency lands
+- [x] Append-only Attempt log; status derived from the newest Attempt. `record` appends and never
+      overwrites, and when given `--attempt-json` it derives `passed`/`failed`/`halted` from the
+      attempt's own `assertions`/`failure` and **refuses** a caller-supplied status that disagrees -
+      closing the exact gap where a plausible-but-wrong status could be recorded by hand (AGENTS.md
+      hard rule 5). Verified: a status contradicting its own assertions is rejected, not silently
+      accepted
 - [ ] Every handle captured by explicit id. **Audit for `.last` and remove every one**
 - [ ] `LocalCmaStub.revert!` in a finally-block, so a crashed Run leaves no pinned account
 - [ ] Database identity recorded on each Attempt

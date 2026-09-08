@@ -12,9 +12,17 @@ The four-character identifier of a card pricing configuration (`0122`, `3M33`). 
 parameter the whole procedure varies by.
 _Avoid_: strategy, product, plan
 
+**Surface**:
+One place the fee content must be checked for a Pricing Strategy Code - the cardmember agreement,
+`predecisioned_terms`, or one of the Schumer/landing pages. Selectable independently
+(`--surface <key>`, e.g. `cma`) or all at once, which is the default. A Run's evidence must name
+every Surface applicable to its code, whether checked, not yet implemented, or blocked - never
+silently reduce "the Run" to just the agreement.
+_Avoid_: page, view, screen, check
+
 **Run**:
-One execution of the procedure against one Pricing Strategy Code: apply, approve, issue,
-render the agreement, assert.
+One execution of the procedure against one Pricing Strategy Code, across every Surface that
+applies to it: apply, approve, issue, render the agreement, assert.
 _Avoid_: test, case, execution
 
 **Pair**:
