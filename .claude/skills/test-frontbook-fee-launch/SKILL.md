@@ -1,6 +1,6 @@
 ---
 name: test-frontbook-fee-launch
-description: Runs one end-to-end frontbook fee launch validation locally for a given pricing strategy code - sets up the stack from nothing, drives a card application to approval in the browser, issues the card, renders the cardmember agreement, and asserts the fee content. By default it runs every Surface implemented for that code (today, that is the cardmember agreement); pass a Surface name to run just one, e.g. "just check the cma surface for 0122" or "run predecisioned_terms for 3M33". Use when asked to "validate strategy 0122", "test the frontbook fee launch", "run the fee validation for CSRV-5300/5301/5302/5303", to check that a backbook code still renders $28/$39 with no foreign transaction fee, or to check one specific surface (cma, predecisioned_terms, schumer_box_basic, schumer_box_apply, schumer_box_landing). This is the LLM-driven version: it drives the browser through browser-harness. Renders go against production TemplateFlow in preview mode, picking up the latest draft of the template.
+description: Runs one end-to-end frontbook fee launch validation locally for a given pricing strategy code - sets up the stack from nothing, drives a card application to approval in the browser, issues the card, renders the cardmember agreement, and asserts the fee content. By default it runs every Surface implemented for that code (today, that is the cardmember agreement); pass a Surface name to run just one, e.g. "just check the cma surface for 0122" or "run predecisioned_terms for 3M33". Use when asked to "validate strategy 0122", "test the frontbook fee launch", "run the fee validation for CSRV-5300/5301/5302/5303", to check that a backbook code still renders $28/$39 with no foreign transaction fee, or to check one specific surface (cma, predecisioned_terms, schumer_box_basic, schumer_box_apply, schumer_box_landing). The cma/predecisioned_terms apply-through-render-through-assert-through-record chain runs as one script call (scripts/run_validation.py) with zero browser-harness tool calls; the LLM still picks the code, decides which Surfaces apply, and drives a stage by hand if that script halts. Renders go against production TemplateFlow in preview mode, picking up the latest draft of the template.
 ---
 
 # Frontbook fee launch validation - one Run
@@ -9,13 +9,16 @@ Proves that a card issued under a given pricing strategy shows the right fees on
 CSRV-5300 asks for, not only the cardmember agreement. Epic CSRV-4119: late fee $28/$39 -> $30/$41,
 plus a new 3% foreign transaction fee, on frontbook codes only.
 
-**You drive this, but not stage by stage.** Setup is scripted, and as of 2026-09-09 so is the apply
-walk and the console phase: `scripts/apply_driver.py` (browser, via browser-harness) and
-`scripts/console_runner.rb` (Rails) each run their whole phase in one call instead of one call per
-stage - see `surfaces/cma.md` Steps 3-4. What is still yours: picking the code, reading the result,
-deciding what a `SubmitFailed` or a Ruby exception means, and driving a stage by hand when one of
-them raises. `ROADMAP.md` 2.1 tracks what full Phase 2 (a standalone CDP client, zero tool calls)
-still needs beyond this.
+**You drive this, but not stage by stage.** Setup is scripted, and as of 2026-09-10 so is the whole
+`cma` + `predecisioned_terms` chain: `python3 scripts/run_validation.py <CODE>` runs apply (via
+`scripts/run_apply_standalone.py` - its own throwaway Chrome, zero browser-harness tool calls,
+ROADMAP 2.1), console (approve/issue/render, `scripts/console_runner.rb`, unchanged), the value-table
+assertions and both Surfaces' `manifest.py record` calls, in one call - see `surfaces/cma.md`'s
+top note. What is still yours: picking the code, choosing which Surfaces apply, reading the result,
+and driving a stage by hand (`surfaces/cma.md` Steps 3-4, or the browser-harness form of the apply
+walk) when `run_validation.py` halts - it prints which stage failed and re-raises rather than
+guessing. `ROADMAP.md` 2.3 tracks what is still open (failure classification beyond Mechanical vs.
+halted, resume); the three Schumer/landing Surfaces are not wired into that script at all.
 
 ## Before anything: the one rule
 
@@ -177,24 +180,30 @@ append-only Attempt rule (AGENTS.md rule 1) can be silently violated by a slippe
 **Invocation:**
 
 - **Bare** ("validate 0122", "test the frontbook fee launch for 3M33"): read
-  `python3 scripts/manifest.py report 0122` first, then run every Surface that applies to the code
-  **and** is Implemented **and** is not already `passed` under the current Template Version. Record
-  the ones that do not apply, are not yet implemented, or are blocked - by name and, if blocked, by
-  ticket - via `record ... not_applicable|not_implemented|blocked` rather than leaving them at
-  `pending`. Never silently narrow a full validation down to just the CMA.
+  `python3 scripts/manifest.py report 0122` first. If `cma` and/or `predecisioned_terms` is not
+  already `passed` under the current Template Version, run `python3 scripts/run_validation.py 0122`
+  once - it produces and records both from one applied application (see below). For the three
+  Schumer/landing Surfaces (not wired into that script), follow each one's own procedure
+  (`surfaces/*.md`) or record `not_applicable`/`not_implemented`/`blocked` by name and, if blocked,
+  by ticket. Never silently narrow a full validation down to just the CMA.
 - **Scoped** ("just check the cma surface for 0122", "run predecisioned_terms for 3M33", or
-  `--surface cma,predecisioned_terms`): run only the named Surface(s) for that code, and record only
-  those cells. If a named Surface does not apply to the code, is not yet implemented, or is blocked,
-  say so plainly, record that status, and do not attempt it - do not improvise steps for a Surface
-  this file has not specified. That is exactly the trap hard rule 5 in `AGENTS.md` warns about: a
-  plausible-looking value for a Surface nobody has actually verified is worse than an explicit
-  "not run".
+  `--surface cma,predecisioned_terms`): if the named Surface is `cma` and/or `predecisioned_terms`,
+  `run_validation.py` is what to run either way - the two are produced by one applied application
+  and it records both cells from that one run (see below); that is not "recording a Surface nobody
+  asked about", it is the same evidence the requested Surface already needed. For any other named
+  Surface, run only its own procedure and record only that cell. If a named Surface does not apply
+  to the code, is not yet implemented, or is blocked, say so plainly, record that status, and do not
+  attempt it - do not improvise steps for a Surface this file has not specified. That is exactly the
+  trap hard rule 5 in `AGENTS.md` warns about: a plausible-looking value for a Surface nobody has
+  actually verified is worse than an explicit "not run".
 - Steps 1-2 above (set up, pick the code) run once regardless of which Surface(s) are selected -
   they are shared prerequisites, not part of any one Surface.
-- `cma` and `predecisioned_terms` both need the **same** applied application - `surfaces/cma.md`
-  Step 3. Running both together means walking that step once and branching after decisioning, never
-  applying twice for one code. The three Schumer/landing Surfaces need no application at all: they
-  are read directly off the code's UUID from the matrix row, once implemented.
+- `cma` and `predecisioned_terms` both need the **same** applied application, and
+  `scripts/run_validation.py` is what walks it once and records both cells now - see
+  `surfaces/predecisioned_terms.md`. Only fall back to `surfaces/cma.md` Steps 3-4's manual
+  per-stage walk when that script halts and something needs to be re-diagnosed by hand. The three
+  Schumer/landing Surfaces need no application at all: they are read directly off the code's UUID
+  from the matrix row, once implemented.
 
 ## Assembling the report across Surfaces
 
@@ -217,11 +226,12 @@ it:
 - If `report` shows a Surface already `passed` under the current Template Version from an earlier
   session, say so and do not re-run it - that is the whole point of recording it durably.
 - Note when `cma` and `predecisioned_terms` shared one applied application (see "Choosing which
-  Surface(s) to run" above) rather than leaving it implicit that two Surfaces shared one apply.
+  Surface(s) to run" above) rather than leaving it implicit that two Surfaces shared one apply -
+  this is automatic when `run_validation.py` produced both, but say so anyway.
 
 ## If something breaks
 
-`FINDINGS.md` in the repo root documents 36 failure modes with symptom, cause, and the file and line
+`FINDINGS.md` in the repo root documents 38 failure modes with symptom, cause, and the file and line
 that proves each. Check it before debugging from scratch - most of what goes wrong here has already
 gone wrong once and been written up.
 

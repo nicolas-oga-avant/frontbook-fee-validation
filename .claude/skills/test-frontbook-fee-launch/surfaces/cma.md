@@ -3,14 +3,29 @@
 Requires `SKILL.md` Steps 1-2 done first (stack up, code and expectations loaded). Applies to all
 28 codes.
 
+**Fastest path (2026-09-10):** `python3 scripts/run_validation.py <CODE>` runs Steps 3-6 below in
+one call - apply, console (issue + render), the Layer 1 value table, and `manifest.py record` for
+both `cma` and `predecisioned_terms`. `--headless` is off by default, so its Chrome window is
+visible the same as a manual walk would be. Drop to the steps below only when it halts (it prints
+which stage and re-raises - the traceback is the diagnosis, not something to route around) or when
+something needs finer control, e.g. `--skip-manifest` while re-checking a fix before it counts as
+an Attempt. See `ROADMAP.md` 2.1 for what this replaced.
+
 ## Step 3 - Apply, in the browser
 
 **Fast path (2026-09-09):** `scripts/apply_driver.py` runs this whole step deterministically - no
-per-stage driving, no LLM deciding what to click. It reuses every helper and every workaround
-below; only the waiting changed (polling for the real signal instead of a fixed `wait(N)` and a
-look - see `apply_harness.py`'s "deterministic driving" section for why that mattered).
+per-stage driving, no LLM deciding what to click. `python3 scripts/run_apply_standalone.py <CODE>`
+runs it against its own throwaway Chrome with zero browser-harness tool calls (ROADMAP 2.1); piping
+the same driver through browser-harness instead is the LLM-driven, token-consuming equivalent -
+reach for that only when you specifically want an agent watching and able to react mid-walk (e.g.
+diagnosing something new the driver itself does not yet handle). Both reuse every helper and every
+workaround below; only the waiting changed (polling for the real signal instead of a fixed
+`wait(N)` and a look - see `apply_harness.py`'s "deterministic driving" section for why that
+mattered).
 
 ```bash
+python3 scripts/run_apply_standalone.py 7M83 --password '...'
+# or, the LLM-driven equivalent via browser-harness:
 CODE=7M83 PASSWORD='...' bash -c 'cat scripts/apply_harness.py scripts/apply_driver.py | browser-harness'
 ```
 
@@ -90,9 +105,11 @@ If only `google` / `doubleclick` / `facebook` requests fire, the form never subm
 
 ## Step 4 - Issue and render, in the console
 
-**Fast path (2026-09-09):** `scripts/console_runner.rb` is everything below in one script. Copy it
-in and run it once with the code, the `application_uuid` Step 3 gave you, and (MLA Runs only) the
-base code:
+**Fast path (2026-09-09):** `scripts/console_runner.rb` is everything below in one script, and
+`scripts/run_validation.py` already runs it for you as part of the one-call chain at the top of
+this file. Run it on its own only when you already have an `application_uuid` from a manual or
+standalone apply and want to continue from here by hand - copy it in and run it once with the
+code, the `application_uuid` Step 3 gave you, and (MLA Runs only) the base code:
 
 ```bash
 docker compose -p "$BASIC_PROJECT" cp scripts/console_runner.rb web:/usr/src/app/tmp/console_runner.rb
@@ -260,6 +277,11 @@ docker compose -p "$BASIC_PROJECT" cp web:/usr/src/app/tmp/observations_0122.jso
 python3 scripts/assert_value_table.py 0122 --observations evidence/run-0122/observations.json
 ```
 
+`run_validation.py` already ran this (via `--json`, for `manifest.py record` to consume as data)
+and printed the verdict. Run the command above by hand only when you already have the observations
+and rendered files and want the human-readable text report instead of re-deriving it from the
+Manifest.
+
 Confetti is read live; every other point comes from the observations file. A point with no
 observation reports `NOT CAPTURED` and fails the Run - an uncaptured point and a passing one look
 identical in a summary, which is the whole reason it is not a skip.
@@ -301,9 +323,11 @@ different TemplateFlow instance and legitimately differs in unrelated ways.
 
 Record the result first: `python3 scripts/manifest.py record <CODE> cma <passed|failed> --attempt-json '...'`
 (the `attempt-json` shape is in `SKILL.md`, "The Manifest is what makes this additive across
-sessions"). That call is this Surface's contribution to the Manifest. When other Surfaces ran too,
-the combined report is `python3 scripts/manifest.py report <CODE>` plus the narrative below - see
-`SKILL.md`, "Assembling the report across Surfaces" - not a hand-combined summary.
+sessions"). `run_validation.py` already does this - for both `cma` and `predecisioned_terms` - as
+the last step of its one call, unless `--skip-manifest` was passed; only do it by hand after the
+manual walk above. That call is this Surface's contribution to the Manifest. When other Surfaces
+ran too, the combined report is `python3 scripts/manifest.py report <CODE>` plus the narrative
+below - see `SKILL.md`, "Assembling the report across Surfaces" - not a hand-combined summary.
 
 Give the user, for the code under test:
 
