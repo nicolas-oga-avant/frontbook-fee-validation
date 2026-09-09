@@ -3,13 +3,16 @@
 Requires `SKILL.md` Steps 1-2 done first (stack up, code and expectations loaded). Applies to all
 28 codes.
 
-**Fastest path (2026-09-10):** `python3 scripts/run_validation.py <CODE>` runs Steps 3-6 below in
-one call - apply, console (issue + render), the Layer 1 value table, and `manifest.py record` for
-both `cma` and `predecisioned_terms`. `--headless` is off by default, so its Chrome window is
-visible the same as a manual walk would be. Drop to the steps below only when it halts (it prints
-which stage and re-raises - the traceback is the diagnosis, not something to route around) or when
-something needs finer control, e.g. `--skip-manifest` while re-checking a fix before it counts as
-an Attempt. See `ROADMAP.md` 2.1 for what this replaced.
+**Fastest path (2026-09-10):** `python3 scripts/run_validation.py <CODE>` runs a Confetti
+pre-flight (SKILL.md's "Check Confetti first", so a stale-config code halts in ~1s, no browser)
+and Steps 3-6 below in one call - apply (which also captures the account-opening Schumer box for
+free), console (issue + render), the Layer 1 value table, the Schumer box assertion, and
+`manifest.py record` for `cma`, `predecisioned_terms` and `schumer_box_apply`. `--headless` is off
+by default, so its Chrome window is visible the same as a manual walk would be. Drop to the steps
+below only when it halts (it prints which stage and re-raises - the traceback is the diagnosis,
+not something to route around) or when something needs finer control, e.g. `--skip-manifest` while
+re-checking a fix before it counts as an Attempt. See `ROADMAP.md` 2.1 and `surfaces/
+schumer_box_apply.md` for what this replaced.
 
 ## Step 3 - Apply, in the browser
 

@@ -106,26 +106,10 @@ Confirm the expectations back to the user before spending a browser walk on them
 
 ### Check Confetti first
 
-Cheap, no browser, and it catches a stale-config false failure before a Run is wasted:
-
-```bash
-B=https://confetti.boston.k8s.prd.app.avant.com
-
-curl -s "$B/config?path=basic.pricing_strategy.pricing_strategy_param_to_id&env=dev" \
-  | python3 -c "import json,sys;print(json.load(sys.stdin)['config'].get('$UUID'))"
-
-curl -s "$B/config?path=basic.pricing_strategy&env=dev" \
-  | python3 -c "import json,sys;print(json.load(sys.stdin)['config']['$CODE'])"
-```
-
-`Avant::Env::Confetti.confetti_env` defaults to `prd` (`avant-basic/lib/avant/env.rb:2788`); only
-`.env.development` sets `dev`. An app on `prd` does not see the dev-only releases, and the new codes
-read as unconfigured. Confirm this before concluding a Run failed.
-
-`mla_forced` codes have no UUID and are not reachable this way. That is by design - check the
-`mla_base_code` row instead. The M code carries no `basic.pricing_strategy` entry of its own
-either: `cma_pricing_strategy_config` falls back to `code_to_mla.key(identifier)`, so an MLA
-account is priced off the base code's entry.
+`python3 scripts/run_validation.py <CODE> --check-confetti` - no stack, no browser, fails in about
+a second on a stale or unpromoted config instead of after a full apply+console cycle. Every real
+Run already runs this as its own first step; this is the standalone form, for checking a code
+before deciding whether to run anything at all.
 
 ## Choosing which Surface(s) to run
 

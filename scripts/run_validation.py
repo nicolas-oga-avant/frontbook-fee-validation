@@ -41,6 +41,13 @@ one point NOT CAPTURED and its `cma` status comes back `failed` - correctly, per
 own rule that an uncaptured point is not a pass, not a regression in this script. Wiring
 `assert_cma_absence.py` in too is separate, unstarted work (it needs the same frontbook-sibling-
 control pairing `schumer_box_apply` uses above).
+
+Before any of that: a Confetti pre-flight (SKILL.md's "Check Confetti first") checks the code's
+uuid resolves and its `basic.pricing_strategy` entry exists, in ~1s and no browser, and halts with
+a clear message if not. `Avant::Env::Confetti.confetti_env` defaults to `prd`, only
+`.env.development` sets `dev`, so a stack that somehow reads `prd` sees a genuinely new code as
+unconfigured - without this check that reads as an apply-flow bug half an hour later instead of a
+one-line diagnosis before a browser is even launched.
 """
 
 import argparse
@@ -49,6 +56,7 @@ import os
 import re
 import subprocess
 import sys
+import urllib.request
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)
@@ -58,6 +66,8 @@ import manifest as manifest_mod          # noqa: E402
 import redline_text                      # noqa: E402
 import run_apply_standalone              # noqa: E402
 
+CONFETTI_BASE = os.environ.get("CONFETTI_BASE", "https://confetti.boston.k8s.prd.app.avant.com")
+
 
 class RunFailed(Exception):
     """A Mechanical Failure at some named stage - always re-raised, never swallowed."""
@@ -66,6 +76,48 @@ class RunFailed(Exception):
         super().__init__("[%s] %s" % (stage, message))
         self.stage = stage
         self.message = message
+
+
+def _confetti_config(path, env, timeout):
+    url = "%s/config?path=%s&env=%s" % (CONFETTI_BASE, path, env)
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            return json.loads(resp.read())["config"]
+    except Exception as e:
+        raise RunFailed("confetti", "could not read %s: %s: %s" % (path, type(e).__name__, e))
+
+
+def confetti_preflight(code, row, env="dev", timeout=10):
+    """SKILL.md's "Check Confetti first", run automatically: fail in ~1s, no browser, on the
+    trap that produces a green run validating nothing - a code Confetti does not resolve reads
+    exactly like a genuine apply-flow bug otherwise, half an hour and a full Chrome+Rails cycle
+    later. An MLA-forced code has no uuid and no basic.pricing_strategy entry of its own by
+    design (SKILL.md) - this checks its mla_base_code's instead.
+    """
+    base_code = row.get("mla_base_code") or code
+    base_row = redline_text.load_row(base_code) if base_code != code else row
+    uuid = base_row.get("uuid")
+    if not uuid:
+        raise RunFailed("confetti", "no uuid for %s (or its mla_base_code %s) in "
+                                     "run-matrix.csv - cannot preflight Confetti"
+                                     % (code, base_code))
+
+    param_to_id = _confetti_config(
+        "basic.pricing_strategy.pricing_strategy_param_to_id", env, timeout)
+    resolved = param_to_id.get(uuid)
+    if resolved != base_code:
+        raise RunFailed("confetti",
+            "pricing_strategy_param_to_id maps uuid %s to %r, not %r, under env=%s - stale or "
+            "unpromoted config (Avant::Env::Confetti.confetti_env defaults to prd; only "
+            ".env.development sets dev - confirm that before concluding this Run failed)"
+            % (uuid, resolved, base_code, env))
+
+    pricing_strategy = _confetti_config("basic.pricing_strategy", env, timeout)
+    if base_code not in pricing_strategy:
+        raise RunFailed("confetti", "no basic.pricing_strategy entry for %r under env=%s - "
+                                     "stale or unpromoted config" % (base_code, env))
+
+    return {"uuid": uuid, "base_code": base_code, "env": env}
 
 
 def _slug(branch):
@@ -196,6 +248,8 @@ def main():
     ap.add_argument("--confetti-env", default="dev")
     ap.add_argument("--skip-manifest", action="store_true",
                      help="run the full chain but do not write to data/manifest.json")
+    ap.add_argument("--check-confetti", action="store_true",
+                     help="only run the Confetti pre-flight and exit - no stack, no browser")
     args = ap.parse_args()
 
     slug = _slug(args.branch)
@@ -209,6 +263,20 @@ def main():
     # schumer_box_apply even applies - that answer is static (it depends only on whether the
     # code has a strategy uuid, FINDINGS #8), never on how the Run itself goes.
     row = redline_text.load_row(args.code)
+
+    if args.check_confetti:
+        # The standalone form of what every real Run already does as its first step (below) -
+        # exists so "check Confetti for this code" never has to mean typing curl by hand or
+        # reading it out of a doc. No stack, no browser, no manifest write.
+        try:
+            info = confetti_preflight(args.code, row, env=args.confetti_env)
+        except RunFailed as e:
+            print("FAILED: %s" % e.message, file=sys.stderr)
+            return 1
+        print("OK: uuid=%s resolves to %s under env=%s" % (
+            info["uuid"], info["base_code"], info["env"]))
+        return 0
+
     is_mla = not row.get("uuid")
     if is_mla:
         print("code %s is MLA-forced: schumer_box_apply is not_applicable (no strategy uuid, "
@@ -216,9 +284,15 @@ def main():
         if not args.skip_manifest:
             record_result(args.code, "schumer_box_apply", "not_applicable")
 
-    stage = "apply"
+    stage = "confetti"
     try:
-        print("[1/5] apply (standalone CDP, zero browser-harness calls)...")
+        print("[1/6] Confetti pre-flight...")
+        confetti_info = confetti_preflight(args.code, row, env=args.confetti_env)
+        print("    uuid=%s resolves to %s under env=%s" % (
+            confetti_info["uuid"], confetti_info["base_code"], confetti_info["env"]))
+
+        stage = "apply"
+        print("[2/6] apply (standalone CDP, zero browser-harness calls)...")
         apply_result = run_apply_standalone.run(args.code, args.password,
                                                  headless=args.headless, out_root=None)
         application_uuid = apply_result["application_uuid"]
@@ -226,7 +300,7 @@ def main():
         print("    application_uuid=%s" % application_uuid)
 
         stage = "console"
-        print("[2/5] console: approve, issue, render...")
+        print("[3/6] console: approve, issue, render...")
         console_result = run_console_phase(args.code, application_uuid, mla_base_code,
                                            project, avant_basic_dir)
         print("    credit_card_account_id=%s template_version=%s render_mode=%s"
@@ -235,23 +309,23 @@ def main():
                  console_result["provenance"]["render_mode"]))
 
         stage = "evidence"
-        print("[3/5] pulling evidence out of the container...")
+        print("[4/6] pulling evidence out of the container...")
         local = collect_evidence(args.code, console_result, project, avant_basic_dir,
                                  evidence_dir)
 
         stage = "assert"
-        print("[4/5] asserting the value table...")
+        print("[5/6] asserting the value table...")
         report, assert_exit = run_assertions(args.code, local["observations"], local["html"],
                                              args.confetti_env)
 
         schumer_status, schumer_detail = None, None
         if not is_mla:
             stage = "schumer_box_apply"
-            print("[5/5] asserting the Schumer box captured during apply...")
+            print("[6/6] asserting the Schumer box captured during apply...")
             schumer_status, schumer_detail = run_schumer_box_apply(
                 args.code, apply_result, row, evidence_dir)
     except Exception as e:
-        # Anything raised by any of the four steps above is a Mechanical Failure by
+        # Anything raised by any of the five steps above is a Mechanical Failure by
         # definition - a click that missed, a stack that is down, a container command that
         # failed (AGENTS.md hard rule 2: an Assertion Failure only exists once
         # assert_value_table.py has actually run and reported a value disagreement, which
