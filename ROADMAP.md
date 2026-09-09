@@ -334,11 +334,13 @@ still blocked on their own tickets.
         report for a code is `scripts/manifest.py report <code>` - see 2.2, pulled forward from
         Phase 2 rather than left as a documentation-only convention
 
-**The two frontbook rows are expected to fail, and that is the point.** CSRV-5843 (in-flow box)
-and CSRV-5845 (landing pages) each own one surface and neither has shipped, so an assertion written
-today fails today and passes the moment they do. Developing them now is what makes the flip
-evidenced rather than asserted. What must never fail for that reason is the `box rendered` guard or
-the annual-fee control: those failing means the capture is broken, not the disclosure.
+**The two frontbook rows are expected to fail without a fix in place, and that is the point.**
+CSRV-5843 (in-flow box) and CSRV-5845 (landing pages) each own one surface, and an assertion written
+against the deployed content fails until they ship. Developing the assertions now is what makes the
+flip evidenced rather than asserted. What must never fail for that reason is the `box rendered`
+guard or the annual-fee control: those failing means the capture is broken, not the disclosure.
+`schumer_box_apply` is now the exception in practice, not in principle: CSRV-5843 already merged, so
+a local override (below) tests its real fix pre-deploy instead of waiting on CSRV-5844.
 
 **Read FINDINGS #35 first.** Reading the code answered two of this section's open questions and
 turned one of them into a result: `/schumer_box/<uuid>` exists only on `mp`, and where it exists it
@@ -384,42 +386,15 @@ hardcodes `Up to $39` and `Foreign Transaction: None` for every strategy. A fron
         never reads the three keys CSRV-5298 added. Capture it anyway - the capture is the
         evidence for asking product whether the launch ships with an application-time disclosure
         quoting the old fees
-- [x] **Account-opening Schumer box**, same six codes. **Captured and asserted 2026-09-03**, and it
-      is a RESULT: both frontbook strategies walked quote `Up to $39` and `Foreign Transaction:
-      None` (FINDINGS #35 part three). **`0122` superseded 2026-09-09**: re-walked against the CAF
-      preview bundle override below and now passes both rows - `9004` has not yet been re-walked
-  - [x] It is **not** at `/apply?...&strategy=<uuid>`, and it is not blocked. The box is a section
-        of the `personal_continued` stage - the same stage that returns `predecisioned_terms` - so
-        it renders today on `main` and is reached by walking, not by navigating. What CSRV-5843 and
-        CSRV-5844 add is the new content, not the surface
-  - [x] `0122` (application 13) and `9004` (application 14) captured, html and png, under
-        `evidence/run-<code>/`. The annual fee row differs correctly between them - `$0` versus the
-        `$125` introductory text - so the box demonstrably reads the strategy and hardcodes the two
-        launch rows anyway. That control is what makes this a defect rather than a mis-walk
-  - [x] Two harness gaps this exposed, both fixed: `capture_surface()` navigated by URL and so
-        screenshotted the first stage rather than the box (`navigate=False`), and a plain
-        screenshot clips the box, which lives in a 240px scroll window over a 740px table, cutting
-        off the fee rows (`element="table.schumer-box"` unclips the ancestors and clips the shot to
-        the element)
-  - [x] The fix site is CAF's `SchumerBox.tsx`, exactly as CSRV-5843 says. An earlier note here
-        blamed the `avant_views` HAML partials; those are the legacy Angular renderer and hardcode
-        the same rows, but did not render this page (FINDINGS #35). The bundle is pinned by
-        `react_index_url` to `micro_frontends/11.4.0`
-  - [x] **Assert against the CAF preview build before CSRV-5844.** Override built and walked
-        2026-09-09 (`local-stack/zzz_local_caf_preview_bundle.rb`, TESTING_BLOCKERS.md item 3) -
-        points `react_index_url` at CAF PR #168's preview bundle without editing the tracked
-        `version_config.yml`; `bootstrap.sh` halts the Run if that bundle 404s. Re-captured `0122`
-        (`schumer_account_opening`) against it: the apply page's served HTML confirmed the dev
-        tools panel's own "Index URL" reads `micro_frontends/168`, and
-        `assert_schumer_box.py evidence/run-0122/schumer_account_opening_0122.html --code 0122`
-        is **ALL PASS** - `Up to $41` and `3% of each foreign transaction in U.S. dollars.` both
-        render, superseding the 2026-09-03 FAIL above for this code. CSRV-5843's actual fix is
-        confirmed working pre-deploy; CSRV-5844's prod-deploy lag is a delivery step now, not a
-        validation blocker. Evidence: `evidence/run-0122/schumer_account_opening_0122.{html,png}`
-  - [ ] Five of the ticket's six not yet walked: `0123`, `3303`, `0120`, `0121`, `3302`. The two
-        captured establish the defect; they are not the ticket's per-strategy evidence. `9004` was
-        walked as the strategy-sensitivity control, and belongs to CSRV-5303 rather than to this
-        six
+- [x] **Account-opening Schumer box**, same six codes. Full history (the defect, the fix site, the
+      CAF preview-bundle override, and the harness gaps it exposed) lives in `FINDINGS.md` #35 and
+      `surfaces/schumer_box_apply.md` - not duplicated here.
+  - [x] **`0122` PASSES as of 2026-09-09**, walked against the CAF preview bundle override
+        (`local-stack/zzz_local_caf_preview_bundle.rb`, TESTING_BLOCKERS.md item 3): `Up to $41`
+        and the 3% foreign transaction row both render. Evidence:
+        `evidence/run-0122/schumer_account_opening_0122.{html,png}`
+  - [ ] Five of the ticket's six not yet walked against the override: `0123`, `3303`, `0120`,
+        `0121`, `3302`. `9004` (the strategy-sensitivity control) belongs to CSRV-5303, not this six
 - [ ] **Contentful landing page** `/credit-card/landing/schumer/<uuid>` agrees with `/apply` for the
       three frontbook codes, per runbook step 15.b. **Blocked on CSRV-5845 + CSRV-5846** - and
       5845's own first acceptance criterion is that 5846 lands first, because all eight pages
