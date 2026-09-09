@@ -1,4 +1,4 @@
-# Surface: schumer_box_apply - implemented, expected to fail until CSRV-5843 + CSRV-5844 ship
+# Surface: schumer_box_apply - implemented, testable pre-deploy via a local override (see below)
 
 `/apply?product_type=credit_card&strategy=<uuid>`, same 16 codes as `schumer_box_basic`. Unlike the
 standalone page, this box exists on `main` today - it is a section of the `personal_continued` apply
@@ -56,7 +56,42 @@ python3 scripts/manifest.py record <CODE> schumer_box_apply failed --attempt-jso
 }'
 ```
 
-CSRV-5843 (the CAF release) and CSRV-5844 (avant-basic's `react_index_url` bump to it) both own this
-surface and are In Progress; the assertions here flip to PASS the day both ship, and until then they
-are expected to fail, not blocked - re-capture on a later Run rather than treating today's result as
-final.
+**Update 2026-09-09 (TESTING_BLOCKERS.md item 3):** CSRV-5843 is merged (CAF PR #168,
+`customer-application-frontend`), not "In Progress" as previously recorded here - only CSRV-5844
+(avant-basic's own `react_index_url` bump) remains, and it is blocked on an operational lag in
+CAF's prod-deploy workflow, not a policy embargo. `local-stack/zzz_local_caf_preview_bundle.rb`
+points this checkout's v6.1 `react_index_url` at CAF PR #168's dev-distribution preview bundle, so
+this surface is testable against CSRV-5843's actual fix **before** CSRV-5844 ships - `bootstrap.sh`
+asserts that bundle URL returns 200 at the start of every Run and halts otherwise.
+
+The 2026-09-03 capture above predates that override and was walked against the old (`11.4.0`)
+bundle, so its FAIL is not evidence of what CSRV-5843 actually fixed.
+
+**Re-walked 2026-09-09 for `0122`.** Confirmed the served apply page's assets and its own dev-tools
+"Index URL" both read `micro_frontends/168` (the override is live), then re-ran the exact capture
+above. Result: **ALL PASS**.
+
+```
+$ python3 scripts/assert_schumer_box.py evidence/run-0122/schumer_account_opening_0122.html --code 0122
+Run 0122 (new), summary box all_other
+
+== new  (evidence/run-0122/schumer_account_opening_0122.html)
+  PASS box rendered (Annual Fee, Foreign Transaction)
+  PASS CONTROL annual fee row quotes $0
+  PASS penalty fee ceiling 'Up to $41'
+  PASS foreign transaction row '3% of each foreign transaction in U.S. dollars.'
+  verdict: ALL PASS
+```
+
+CSRV-5843's fix works pre-deploy. Not yet re-walked: `9004` (the introductory-annual-fee control)
+and the other four codes this surface owns (`0123`, `3303`, `0120`, `0121`, `3302`) - this result
+covers one code, not the full six. Record it in the Manifest once `data/manifest.json` is seeded
+(TESTING_BLOCKERS.md item 8):
+
+```bash
+python3 scripts/manifest.py record 0122 schumer_box_apply passed --attempt-json '{
+  "stage": "asserted",
+  "evidence_dir": "evidence/run-0122/",
+  "note": "against CAF PR #168 preview bundle override, not the deployed react_index_url"
+}'
+```

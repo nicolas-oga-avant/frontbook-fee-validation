@@ -152,7 +152,7 @@ You should not, but if you do:
 
 ## The local patches
 
-Four untracked files, all backed up in `local-stack/` and replayed by `restore.sh`:
+Untracked files, all backed up in `local-stack/` and replayed by `restore.sh`:
 
 | File | Why it exists |
 | --- | --- |
@@ -160,8 +160,14 @@ Four untracked files, all backed up in `local-stack/` and replayed by `restore.s
 | `avant-basic/config/initializers/zzz_local_transunion_mock.rb` | registers `FakeTransunion`, without which every local application declines (FINDINGS #14) |
 | `avant-basic/config/initializers/zzz_local_cma_stub.rb` | `LocalCmaStub` - fills the Fiserv-only fields so a freshly issued card can render a CMA (FINDINGS #15) |
 | `avant-basic/config/initializers/zzz_local_mla_stub.rb` | forces MLA-positive TransUnion so the 12 MLA Runs are reachable (FINDINGS #3). **Not yet written** - see `ROADMAP.md` |
+| `avant-basic/config/initializers/zzz_local_caf_preview_bundle.rb` | points `us_avantcredit_credit_card` v6.1's `react_index_url` at CAF PR #168's preview bundle so `schumer_box_apply` can validate CSRV-5843 before CSRV-5844's prod deploy lands (FINDINGS #35, `TESTING_BLOCKERS.md` item 3) - patches the config loader rather than editing the tracked `version_config.yml`, since that file is shared with other agent sessions |
 | `credit-card-api/compose.override.yml` | live minio image, local basic, dev FDR gateway, and `CONFETTI_URL` |
 | `crm/docker-compose.override.yml` | CSP against local basic, password login instead of Okta, host port 4000 |
+
+`bootstrap.sh` asserts the CAF preview bundle URL returns 200 on every Run (Step 6, alongside the
+other silent-failure checks) - it is an ephemeral CI artifact on another team's pipeline with no
+retention guarantee, and a 404 there is a halt-and-report, never a silent fall-back to the pinned
+prod bundle it replaces.
 
 The `zzz` prefix is load-bearing: these must run after `mock_services.rb`, which enables WebMock.
 

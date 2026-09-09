@@ -386,7 +386,8 @@ hardcodes `Up to $39` and `Foreign Transaction: None` for every strategy. A fron
         quoting the old fees
 - [x] **Account-opening Schumer box**, same six codes. **Captured and asserted 2026-09-03**, and it
       is a RESULT: both frontbook strategies walked quote `Up to $39` and `Foreign Transaction:
-      None` (FINDINGS #35 part three)
+      None` (FINDINGS #35 part three). **`0122` superseded 2026-09-09**: re-walked against the CAF
+      preview bundle override below and now passes both rows - `9004` has not yet been re-walked
   - [x] It is **not** at `/apply?...&strategy=<uuid>`, and it is not blocked. The box is a section
         of the `personal_continued` stage - the same stage that returns `predecisioned_terms` - so
         it renders today on `main` and is reached by walking, not by navigating. What CSRV-5843 and
@@ -404,9 +405,17 @@ hardcodes `Up to $39` and `Foreign Transaction: None` for every strategy. A fron
         blamed the `avant_views` HAML partials; those are the legacy Angular renderer and hardcode
         the same rows, but did not render this page (FINDINGS #35). The bundle is pinned by
         `react_index_url` to `micro_frontends/11.4.0`
-  - [ ] **Assert against the CAF preview build before CSRV-5844.** Pointing `react_index_url` at
-        the preview bundle is the only way to get a pre-deploy pass out of this surface, and it
-        turns CSRV-5844 into a delivery step rather than a blocker on validation
+  - [x] **Assert against the CAF preview build before CSRV-5844.** Override built and walked
+        2026-09-09 (`local-stack/zzz_local_caf_preview_bundle.rb`, TESTING_BLOCKERS.md item 3) -
+        points `react_index_url` at CAF PR #168's preview bundle without editing the tracked
+        `version_config.yml`; `bootstrap.sh` halts the Run if that bundle 404s. Re-captured `0122`
+        (`schumer_account_opening`) against it: the apply page's served HTML confirmed the dev
+        tools panel's own "Index URL" reads `micro_frontends/168`, and
+        `assert_schumer_box.py evidence/run-0122/schumer_account_opening_0122.html --code 0122`
+        is **ALL PASS** - `Up to $41` and `3% of each foreign transaction in U.S. dollars.` both
+        render, superseding the 2026-09-03 FAIL above for this code. CSRV-5843's actual fix is
+        confirmed working pre-deploy; CSRV-5844's prod-deploy lag is a delivery step now, not a
+        validation blocker. Evidence: `evidence/run-0122/schumer_account_opening_0122.{html,png}`
   - [ ] Five of the ticket's six not yet walked: `0123`, `3303`, `0120`, `0121`, `3302`. The two
         captured establish the defect; they are not the ticket's per-strategy evidence. `9004` was
         walked as the strategy-sensitivity control, and belongs to CSRV-5303 rather than to this

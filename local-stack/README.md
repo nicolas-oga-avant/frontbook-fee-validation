@@ -17,6 +17,7 @@ checkouts deletes them. These are the backups.
 | `zzz_local_consolidated_cma.rb` | `avant-basic/config/initializers/` |
 | `zzz_local_render_provenance.rb` | `avant-basic/config/initializers/` |
 | `zzz_local_cma_render.rb` | `avant-basic/config/initializers/` |
+| `zzz_local_caf_preview_bundle.rb` | `avant-basic/config/initializers/` |
 | `credit-card-api.compose.override.yml` | `credit-card-api/compose.override.yml` |
 | `crm.docker-compose.override.yml` | `crm/docker-compose.override.yml` |
 
@@ -34,6 +35,7 @@ switch branches to accommodate them.
 | `zzz_local_consolidated_cma.rb` | lets the `needs_consolidated_cma` tag past the Optimizely guard, so Runs render the consolidated CMA - the only template carrying the fee variables (FINDINGS #21) |
 | `zzz_local_render_provenance.rb` | refuses a CMA render unless `preview` and `allow_unapproved` are both on, and records the template version the render used (FINDINGS #22) |
 | `zzz_local_cma_render.rb` | `LocalCmaRender` - renders one agreement, asserts the template it resolved to, and stamps the version id onto the Run |
+| `zzz_local_caf_preview_bundle.rb` | points `us_avantcredit_credit_card` v6.1's `react_index_url` at CAF PR #168's preview bundle, so `schumer_box_apply` can validate CSRV-5843 pre-deploy (FINDINGS #35, TESTING_BLOCKERS.md item 3) |
 | `credit-card-api.compose.override.yml` | live minio image, local basic, dev FDR gateway, and `CONFETTI_URL` (not `_URI`) |
 | `crm.docker-compose.override.yml` | CSP against local basic, password login instead of Okta, host port 4000 |
 

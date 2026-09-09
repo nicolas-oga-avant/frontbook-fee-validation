@@ -287,7 +287,8 @@ ok "TemplateFlow key reached the container"
 bootlog="$(cd "$VALIDATION_ROOT/avant-basic" && docker compose -p "$BASIC_PROJECT" exec -T web \
   sh -c 'grep -h "\[local\]" log/development.log 2>/dev/null' 2>/dev/null || true)"
 for want in 'LocalConsolidatedCma active' 'LocalRenderProvenance active' 'LocalMlaStub active' \
-            'LocalRunObservations active' 'FakeTransunion mock registered'; do
+            'LocalRunObservations active' 'LocalCafPreviewBundle active' \
+            'FakeTransunion mock registered'; do
   case "$bootlog" in
     *"$want"*) ok "boot log: $want" ;;
     *) die "no '[local] $want' in log/development.log.
@@ -301,6 +302,26 @@ http="$(curl -s -o /dev/null -m 25 -w '%{http_code}' \
 [ "$http" = "200" ] || die "TemplateFlow returned $http for the templates list.
   401 means the key is wrong. Take STAGING_API_KEY, not API_KEY."
 ok "TemplateFlow reachable and the key is accepted"
+
+# CAF PR #168's dev-distribution preview bundle (CSRV-5843 pre-deploy path, TESTING_BLOCKERS.md
+# item 3 / FINDINGS #35) is an ephemeral CI artifact on another team's pipeline with no retention
+# guarantee - it can vanish between sessions with no warning anywhere else. A 404 here is a
+# halt-and-report (AGENTS.md: assume silence means failure), never a silent fall-back to the
+# pinned prod bundle zzz_local_caf_preview_bundle.rb replaces - that would make schumer_box_apply
+# quietly test the old CAF release again.
+caf="$(curl -s -o /dev/null -m 20 -w '%{http_code}' \
+  https://d1gm0t5fpu3i9c.cloudfront.net/micro_frontends/168/index.html || true)"
+[ "$caf" = "200" ] || die "CAF PR #168 preview bundle returned $caf, expected 200.
+  This is expected to eventually go away - it is CI-artifact retention on another team's
+  pipeline, not this repo's to fix. Options:
+    - CSRV-5844 may have shipped: check whether react_index_url in
+      avant-basic/config/customer_application/us_avantcredit_credit_card/v/6.1/version_config.yml
+      already carries a newer bundle, and if so retire zzz_local_caf_preview_bundle.rb.
+    - Otherwise, find CAF PR #168's current preview URL (may have been re-triggered) and update
+      PREVIEW_BUNDLE_URL in local-stack/zzz_local_caf_preview_bundle.rb and this check.
+  Do not proceed and report schumer_box_apply as untestable rather than falling back to the old
+  bundle silently."
+ok "CAF preview bundle reachable (PR #168, CSRV-5843 pre-deploy path)"
 
 printf '\nReady. basic :5001   ccapi :7100   CSP :4000/us/\n'
 printf 'Checkouts: %s\n' "$VALIDATION_ROOT"

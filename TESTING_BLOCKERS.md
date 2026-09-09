@@ -61,7 +61,7 @@ detect approval automatically. Design agreed 2026-09-08:
 STATUS: NEEDS RE-CHECK once implemented and again whenever CSRV-5895 actually lands - the 8-code /
 deployed-SHA facts above are dated 2026-09-08 and will drift.
 
-## 3. schumer_box_apply blocked on CSRV-5843 + CSRV-5844 - RESOLVED, not blocked; needs a local override
+## 3. schumer_box_apply blocked on CSRV-5843 + CSRV-5844 - RESOLVED, not blocked; local override built
 
 Stub (`surfaces/schumer_box_apply.md`) says blocked on both tickets. Walked down 2026-09-09:
 
@@ -92,17 +92,51 @@ https://d1gm0t5fpu3i9c.cloudfront.net/micro_frontends/168/index.html   -> curled
 ```
 
 This is the "CAF preview bundle" CSRV-5879's technical notes and FINDINGS #35 / ROADMAP 1.7 already
-named as the intended pre-deploy path. Resolution: point `main`'s
-`config/customer_application/us_avantcredit_credit_card/v/6.1/version_config.yml` `react_index_url`
-at that URL as an **untracked local-stack override** (hard rule 4/7) - not a dependency on CSRV-5844
-or on CAF's prod-deploy schedule.
+named as the intended pre-deploy path.
 
-**Caveat, not yet built:** the override file itself (`local-stack/` copy of `version_config.yml` +
-a `restore()` line in `restore.sh`) doesn't exist yet - this session only confirmed the path is
-viable. The preview bundle is an ephemeral CI artifact on the dev distribution with no retention
-guarantee, owned by another team's pipeline - **assert it 200s at the start of every Run** rather
-than assuming it persists; a 404 here is a halt-and-report (hard rule/"assume silence means
-failure"), not a fallback to old content.
+**Built 2026-09-09.** Resolution is `local-stack/zzz_local_caf_preview_bundle.rb`, restored by
+`restore.sh` into `avant-basic/config/initializers/`: it prepends onto
+`CustomerApplicationEngine::Core::Config`'s singleton class and overrides `load_version_config` so
+that, for exactly `us_avantcredit_credit_card` v6.1, the parsed `react_index_url` is replaced with
+the CAF PR #168 URL above - **not** by editing the tracked `version_config.yml` on disk. That file
+lives in the shared `avant-basic` checkout (hard rule 4): a modified *tracked* file shows up as a
+diff in `git status` regardless of `.git/info/exclude`, which only suppresses untracked files -
+unlike every other override here, which adds a new file. `Config.for` defaults `flush: true` in
+`Rails.env.development?`, so once the initializer is loaded its override re-applies fresh on every
+request with no restart needed for further changes. The initializer itself DOES need one, though,
+same as any new file under `config/initializers/` - Rails collects that list once at boot. Confirmed
+2026-09-09 against a `basic` container that had been running since before this file existed:
+`docker compose ... restart web` picked it up (boot log then carried `[local] LocalCafPreviewBundle
+active`), and `restore.sh`'s git-visibility check still showed 0 tracked-visible files in
+`avant-basic`.
+
+**Walked and confirmed 2026-09-09.** Applied for `0122` against the live override: the served apply
+page's script tags and its own dev-tools "Index URL" both read `micro_frontends/168`, and
+`assert_schumer_box.py evidence/run-0122/schumer_account_opening_0122.html --code 0122` is
+**ALL PASS** - `Up to $41` and `3% of each foreign transaction in U.S. dollars.` both render.
+CSRV-5843's fix is confirmed working pre-deploy for this code; see `surfaces/schumer_box_apply.md`
+for the full transcript and `evidence/run-0122/schumer_account_opening_0122.{html,png}`. `9004` and
+the surface's other four codes are not yet re-walked against the override.
+
+**The retention caveat is real and is now enforced, not just noted.** `bootstrap.sh`'s
+"Silent-failure checks" step (Step 6) curls the CAF preview bundle URL and dies with a
+halt-and-report (repro steps, and where to look for whether CSRV-5844 shipped in the meantime) if
+it is not a 200 - it also checks the `[local] LocalCafPreviewBundle active` boot-log line, same as
+every other `zzz_local_*` initializer. This runs at the start of every Run via Step 1 of the SKILL,
+so a vanished preview bundle halts before any application is walked, rather than producing a
+`schumer_box_apply` capture of the OLD CAF release with nothing saying so.
+
+**Follow-on, not yet done:** if CSRV-5844 ships (CAF's own prod-deploy workflow catches up and
+`react_index_url` in the tracked `version_config.yml` is bumped for real), this override becomes
+redundant - not wrong, since it always points at the *same* fixed content regardless of what the
+tracked file says, but worth retiring so a future session isn't left wondering why the preview
+bundle check still gates every Run. Re-check Jira/the file diff periodically (see item 2's pattern)
+and remove `zzz_local_caf_preview_bundle.rb` from `restore.sh` and the boot-log/curl checks in
+`bootstrap.sh` once it lands.
+
+STATUS: NEEDS RE-CHECK whenever `bootstrap.sh` reports the CAF preview bundle check failing (PR
+#168's build can be re-triggered or expire off CloudFront with no other warning) and once CSRV-5844
+actually ships.
 
 ## 4. schumer_box_landing blocked on CSRV-5845 + CSRV-5846 - OPEN, same shape as item 3
 
