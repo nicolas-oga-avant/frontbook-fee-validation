@@ -1,10 +1,11 @@
 """One script call for a Run: apply -> approve/issue/render -> assert -> record.
 
-Chains four pieces that already work independently and were each verified live on their own:
+Chains five pieces that already work independently and were each verified live on their own:
 
     scripts/run_apply_standalone.py   apply, zero browser-harness calls (ROADMAP 2.1)
     scripts/console_runner.rb         approve/issue/render, inside the basic container, unchanged
     scripts/assert_value_table.py     the five-point value table, --json
+    scripts/assert_schumer_box.py     the account-opening Schumer box, captured mid-apply for free
     scripts/manifest.py record        durable per-Surface status
 
     python3 scripts/run_validation.py 0122
@@ -16,11 +17,30 @@ exactly as reported, never retried or reinterpreted. A raised exception anywhere
 console phase is a Mechanical Failure by definition - it is recorded `halted`, not silently
 swallowed, and always re-raised to the caller (assume silence means failure).
 
-Scope: `cma` and `predecisioned_terms`, from one applied application - per
-surfaces/predecisioned_terms.md, that Surface IS assert_value_table.py's point "2. Decisioned
-application", already computed here, just never recorded under its own name until now. The other
-three Surfaces (schumer_box_*) are not wired in here - see
-.claude/skills/test-frontbook-fee-launch/SKILL.md for what still needs a human/LLM per Surface.
+Scope: `cma`, `predecisioned_terms` and `schumer_box_apply`, from one applied application.
+`predecisioned_terms` IS assert_value_table.py's point "2. Decisioned application" - already
+computed here, just recorded under its own name too (surfaces/predecisioned_terms.md).
+`schumer_box_apply`'s evidence is a side effect of the apply walk itself
+(apply_harness.py's capture_surface, called from apply_driver.py's run_apply()) - this only
+asserts what was already captured, nothing new to walk. Not applicable at all to an MLA-forced
+code (no strategy uuid, so no Schumer surface exists for it - FINDINGS #8), and for a BACKBOOK
+code it only has teeth (assert_schumer_box.py's absence checks) if its frontbook sibling was
+already run through this script too, so its capture sits on disk to use as `--control` - a
+backbook code run standalone still asserts, honestly, without one and can legitimately come back
+`failed` ("unproven") rather than silently skipped.
+
+The two Schumer surfaces this script does NOT touch are `schumer_box_basic` (unreachable on
+`main`, FINDINGS #35) and `schumer_box_landing` (blocked on unshipped tickets) - see
+.claude/skills/test-frontbook-fee-launch/SKILL.md for what those still need a human/LLM for.
+
+Known, pre-existing incompleteness for a BACKBOOK code's `cma` verdict specifically: Layer 1's
+foreign-transaction-absence point is deliberately proven by a separate script
+(`assert_cma_absence.py`, `surfaces/cma.md` Step 5's "Absence is a positive assertion"), not by
+`assert_value_table.py`. This script only runs the latter, so a backbook code always shows that
+one point NOT CAPTURED and its `cma` status comes back `failed` - correctly, per this project's
+own rule that an uncaptured point is not a pass, not a regression in this script. Wiring
+`assert_cma_absence.py` in too is separate, unstarted work (it needs the same frontbook-sibling-
+control pairing `schumer_box_apply` uses above).
 """
 
 import argparse
@@ -35,6 +55,7 @@ _ROOT = os.path.dirname(_HERE)
 sys.path.insert(0, _HERE)
 
 import manifest as manifest_mod          # noqa: E402
+import redline_text                      # noqa: E402
 import run_apply_standalone              # noqa: E402
 
 
@@ -119,9 +140,41 @@ def run_assertions(code, observations_path, rendered_path, confetti_env):
                                    "stderr:\n%s" % (r.returncode, r.stderr[-4000:]))
 
 
-def record_result(code, surface, status, attempt_json, blocked_on=None):
+def record_result(code, surface, status, attempt=None, blocked_on=None):
     manifest_mod.record(code, surface, status,
-                        attempt_json=json.dumps(attempt_json), blocked_on=blocked_on)
+                        attempt_json=json.dumps(attempt) if attempt is not None else None,
+                        blocked_on=blocked_on)
+
+
+def run_schumer_box_apply(code, apply_result, row, evidence_dir):
+    """Assert the Schumer box apply_driver.py already captured mid-walk. Returns
+    (status, detail) - status is "passed" or "failed" (never "not_applicable" here; that is
+    decided in main() from the code's row alone, before a browser is even launched)."""
+    capture = apply_result.get("schumer_account_opening_capture")
+    if capture is None:
+        return "failed", {"reason": "apply produced no schumer_account_opening_capture even "
+                                     "though the code is not MLA-forced - check apply_driver.py"}
+
+    cmd = [sys.executable, os.path.join(_HERE, "assert_schumer_box.py"), capture["html"],
+           "--code", code]
+    control_path = None
+    if row["role"] != "new":
+        sibling = row["replaces_or_replaced_by"]
+        candidate = os.path.join(_ROOT, "evidence", "run-%s" % sibling,
+                                 "schumer_account_opening_%s.html" % sibling)
+        if os.path.exists(candidate):
+            control_path = candidate
+            cmd += ["--control", control_path]
+
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    out_path = os.path.join(evidence_dir, "schumer_box_apply_%s.txt" % code)
+    with open(out_path, "w") as fh:
+        fh.write(r.stdout + r.stderr)
+
+    return "passed" if r.returncode == 0 else "failed", {
+        "capture": capture["html"], "control": control_path,
+        "output_file": out_path, "exit_code": r.returncode,
+    }
 
 
 def _status_for(rows):
@@ -152,9 +205,20 @@ def main():
     project = args.compose_project or ("basic-frontbook-fee-validation%s" % slug)
     evidence_dir = os.path.join(_ROOT, "evidence", "run-%s" % args.code)
 
+    # Fail fast on a typo'd code before spending a browser walk on it, and settle whether
+    # schumer_box_apply even applies - that answer is static (it depends only on whether the
+    # code has a strategy uuid, FINDINGS #8), never on how the Run itself goes.
+    row = redline_text.load_row(args.code)
+    is_mla = not row.get("uuid")
+    if is_mla:
+        print("code %s is MLA-forced: schumer_box_apply is not_applicable (no strategy uuid, "
+              "FINDINGS #8)" % args.code)
+        if not args.skip_manifest:
+            record_result(args.code, "schumer_box_apply", "not_applicable")
+
     stage = "apply"
     try:
-        print("[1/4] apply (standalone CDP, zero browser-harness calls)...")
+        print("[1/5] apply (standalone CDP, zero browser-harness calls)...")
         apply_result = run_apply_standalone.run(args.code, args.password,
                                                  headless=args.headless, out_root=None)
         application_uuid = apply_result["application_uuid"]
@@ -162,7 +226,7 @@ def main():
         print("    application_uuid=%s" % application_uuid)
 
         stage = "console"
-        print("[2/4] console: approve, issue, render...")
+        print("[2/5] console: approve, issue, render...")
         console_result = run_console_phase(args.code, application_uuid, mla_base_code,
                                            project, avant_basic_dir)
         print("    credit_card_account_id=%s template_version=%s render_mode=%s"
@@ -171,14 +235,21 @@ def main():
                  console_result["provenance"]["render_mode"]))
 
         stage = "evidence"
-        print("[3/4] pulling evidence out of the container...")
+        print("[3/5] pulling evidence out of the container...")
         local = collect_evidence(args.code, console_result, project, avant_basic_dir,
                                  evidence_dir)
 
         stage = "assert"
-        print("[4/4] asserting the value table...")
+        print("[4/5] asserting the value table...")
         report, assert_exit = run_assertions(args.code, local["observations"], local["html"],
                                              args.confetti_env)
+
+        schumer_status, schumer_detail = None, None
+        if not is_mla:
+            stage = "schumer_box_apply"
+            print("[5/5] asserting the Schumer box captured during apply...")
+            schumer_status, schumer_detail = run_schumer_box_apply(
+                args.code, apply_result, row, evidence_dir)
     except Exception as e:
         # Anything raised by any of the four steps above is a Mechanical Failure by
         # definition - a click that missed, a stack that is down, a container command that
@@ -189,9 +260,13 @@ def main():
         message = e.message if isinstance(e, RunFailed) else "%s: %s" % (type(e).__name__, e)
         print("HALTED at %s: %s" % (stage, message), file=sys.stderr)
         if not args.skip_manifest:
-            # Both Surfaces share this one applied application (surfaces/predecisioned_terms.md)
-            # - a halt before assertion ran denies evidence to both equally.
-            for surface in ("cma", "predecisioned_terms"):
+            # All three share this one applied application - a halt before assertion ran
+            # denies evidence to all equally. schumer_box_apply is excluded for an MLA code:
+            # it was already recorded not_applicable above, independent of how this Run goes,
+            # and halted would be a status that disagrees with a fact that never depended on
+            # this attempt in the first place.
+            surfaces = ["cma", "predecisioned_terms"] + ([] if is_mla else ["schumer_box_apply"])
+            for surface in surfaces:
                 record_result(args.code, surface, "halted", {
                     "stage": stage,
                     "provenance": {},
@@ -220,11 +295,16 @@ def main():
     pt_status = _status_for(pt_assertions)
 
     print()
-    print("verdict: cma=%s (%d/%d), predecisioned_terms=%s (%d/%d)%s" % (
+    print("verdict: cma=%s (%d/%d), predecisioned_terms=%s (%d/%d)%s%s" % (
         status, sum(1 for a in assertions if a["passed"]), len(assertions),
         pt_status, sum(1 for a in pt_assertions if a["passed"]), len(pt_assertions),
         " - RPF not verifiable on this stack, FINDINGS #36, does not block either Surface"
-        if report["rpf"]["rows"][0]["status"] != "PASS" else ""))
+        if report["rpf"]["rows"][0]["status"] != "PASS" else "",
+        ", schumer_box_apply=not_applicable" if is_mla else
+        ", schumer_box_apply=%s%s" % (
+            schumer_status,
+            " (no --control found for this backbook code - unproven, see output file)"
+            if row["role"] != "new" and not schumer_detail.get("control") else "")))
 
     provenance = {
         "templateflow_host": console_result["provenance"]["templateflow_host"],
@@ -242,10 +322,24 @@ def main():
             "stage": "asserted", "provenance": provenance, "evidence_dir": evidence_dir_rel,
             "assertions": pt_assertions,
         })
+        if not is_mla:
+            record_result(args.code, "schumer_box_apply", schumer_status, {
+                "stage": "asserted",
+                "provenance": {"capture": schumer_detail.get("capture"),
+                               "control": schumer_detail.get("control")},
+                "evidence_dir": evidence_dir_rel,
+                "assertions": [{
+                    "label": "schumer_box_apply value table (assert_schumer_box.py)",
+                    "passed": schumer_status == "passed",
+                    "output_file": schumer_detail.get("output_file"),
+                }],
+            })
     else:
         print("(--skip-manifest: not recorded)")
 
-    return 0 if status == "passed" and pt_status == "passed" else 1
+    all_passed = status == "passed" and pt_status == "passed" and (
+        is_mla or schumer_status == "passed")
+    return 0 if all_passed else 1
 
 
 if __name__ == "__main__":

@@ -1170,3 +1170,50 @@ apply phase once on a `SubmitFailed` whose diagnostic shows `stuck at 'about:bla
 validation failure - a stage genuinely blocked mid-flow - looks nothing like this, so a narrow
 retry on exactly this signature would not mask a real Mechanical or Assertion Failure). Neither is
 implemented: this Run's retry was manual.
+
+## 39. Ten applications a day from one IP, then every apply URL 500s - and it looks exactly like FINDINGS #38
+
+**Symptom.** `scripts/run_validation.py 0120` raised `SubmitFailed: never reached #/personal
+within 20s of navigating`, identically on two consecutive attempts - not a one-off like #38.
+`curl`-ing the apply URL directly (bypassing the CDP client entirely) returned HTTP 500, a Rails
+exception page: `RuntimeError in ApplyController#index` / `Maximum of 10 applications per day from
+IP 192.168.117.1`.
+
+**Cause.** `Customer#check_and_track_application_rate_limit!`
+(`avant-basic/app/models/customer.rb:759`) calls `Avant::CustomerFraudRingTracker` with
+`raise_on_limit: true` once an IP has created `CustomerApplication::MAXIMUM_ALLOWED_PER_DAY_FROM_SAME_IP`
+(10) applications in a day, tracked in Redis
+(`customer_fraud_ring:rate_limit:application_creation:ip_address:<ip>:<date>`,
+`lib/avant/customer_fraud_ring_tracker.rb:131`). It exempts internal IPs
+(`Util::WhiteList.internal_ip?`, `lib/avant/util/white_list.rb:5`), but that list is a hardcoded
+handful of office/VPN/AWS addresses - it does not cover a Docker bridge network, so the
+container's own gateway IP (`192.168.117.1` here; varies by machine) counts as external. A single
+validation session that walks the apply flow more than 10 times in a day - trivial once
+`run_apply_standalone.py`/`run_validation.py` make each Run cheap enough to retry casually - trips
+this for every subsequent Run, and the resulting 500 looks identical to FINDINGS #38's transient
+timeout: `apply_driver.py` only polls the SPA's hash, so a 500 before the page ever loads reads as
+"stuck at 'about:blank'" or "stuck at \<the apply URL\>", not as a rate limit.
+
+**Distinguishing the two:** #38 is a one-off that succeeds identically on retry. This is not - it
+repeats on every attempt until the Redis key expires (up to 24h) or is cleared, and `curl`-ing the
+apply URL directly (no browser needed) shows the 500 immediately.
+
+**Unblock now**, without touching the checkout:
+
+```bash
+docker compose -p "$BASIC_PROJECT" exec -T redis redis-cli \
+  DEL "customer_fraud_ring:rate_limit:application_creation:ip_address:<IP>:<YYYY-MM-DD>"
+```
+
+Get `<IP>` from the container logs (`docker compose -p "$BASIC_PROJECT" logs web | grep "applications per day"`)
+or `redis-cli KEYS "customer_fraud_ring:*"`.
+
+**Not yet fixed durably.** This will keep happening - a single 28-code Campaign is already close
+to the limit, run twice in a day and it is guaranteed. Two options, neither applied: a local-stack
+initializer that adds the Docker bridge range to `Util::WhiteList::INTERNAL_IPS` (matches the
+existing `zzz_local_*.rb` pattern, but that constant is a frozen array of `IPAddr`, built at load
+time - would need reopening the module, not just appending), or one that stubs
+`check_and_track_application_rate_limit!` to a no-op under `Rails.env.development?` (simpler,
+mirrors `zzz_local_render_provenance.rb`'s guard). Whichever lands should also decide whether
+`run_validation.py` should pre-flight-check the Redis key and clear it automatically, or just
+surface a clearer error than a generic `SubmitFailed`.

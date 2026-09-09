@@ -16,6 +16,15 @@ CSRV-5844 (the real `react_index_url` bump) is stuck on an operational lag, not 
 `TESTING_BLOCKERS.md` item 3 for why. Without that override (or once CSRV-5844 ships for real), the
 two launch rows are hardcoded and every frontbook capture fails both fee assertions.
 
+**Fast path (2026-09-10):** `python3 scripts/run_validation.py <CODE>` captures and asserts this
+Surface for free as part of its one-call chain - `apply_driver.py`'s `run_apply()` already grabs
+this exact capture mid-walk (`capture_surface(code, "schumer_account_opening", ...)`, called right
+after `#/personal_continued` loads), so nothing extra is walked. For a backbook code, run its
+frontbook sibling through the same script first if you want the absence checks to have teeth (a
+`--control`) rather than come back honestly `failed` as "unproven". The manual capture and
+`assert_schumer_box.py` invocation below remain the fallback for re-diagnosing a specific capture,
+or for driving a code `run_validation.py` doesn't reach.
+
 ## Capturing it
 
 Exists only part-way through an application:
@@ -50,8 +59,16 @@ past Run failed.**
 **Verified 2026-09-09 for `0122`** against the live override: served page and its dev-tools "Index
 URL" both confirmed `micro_frontends/168`, and the assertion is **ALL PASS** - `Up to $41` and `3%
 of each foreign transaction in U.S. dollars.` both render. Evidence:
-`evidence/run-0122/schumer_account_opening_0122.{html,png}`. Not yet re-walked against the override:
-`9004` and the surface's other four codes (`0123`, `3303`, `0120`, `0121`, `3302`).
+`evidence/run-0122/schumer_account_opening_0122.{html,png}`.
+
+**Verified 2026-09-10 for `0120`** (backbook) through `run_validation.py`, with `0122`'s
+already-captured html as `--control`: **ALL PASS** on the box itself, and the control run
+(0122's capture, scored under backbook expectations) failed all 4 discriminating checks -
+"checks that discriminate: 4 of 4", zero `NO TEETH`. Not yet walked: `9004` and the surface's
+other four codes (`0123`, `3303`, `0121`, `3302`).
+
+`run_validation.py` runs the capture, the assertion and the `manifest.py record` call below
+automatically as part of its one-call chain - do the following by hand only outside that script:
 
 ```bash
 python3 scripts/manifest.py record <CODE> schumer_box_apply passed --attempt-json '{
