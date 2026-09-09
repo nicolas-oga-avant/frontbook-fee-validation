@@ -338,6 +338,9 @@ def main():
     ap.add_argument("--rendered", help="rendered agreement html, if not in the observations")
     ap.add_argument("--confetti-env", default="dev")
     ap.add_argument("--offline", action="store_true", help="skip the live Confetti read")
+    ap.add_argument("--json", action="store_true",
+                     help="print one machine-readable JSON object instead of the text report "
+                          "(for scripts/run_validation.py) - same verdict, same exit code")
     args = ap.parse_args()
 
     row = load_row(args.code)
@@ -348,25 +351,54 @@ def main():
 
     rendered = args.rendered or (obs.get("rendered") or {}).get("html")
 
-    print("Run %s (%s, ticket %s), summary box %s\n"
-          % (row["code"], row["role"], row["ticket"], summary_box_for(row)))
-
-    points = [
+    # RPF is computed and reported separately from the other five points in both output modes:
+    # it is "orthogonal to the five" (module docstring) and, per FINDINGS #36, not verifiable on
+    # this stack at all - a caller deciding pass/fail for the cma Surface itself (as
+    # run_validation.py does) needs the two kept apart rather than one flat list.
+    core_points = [
         ("1. Confetti", confetti_point(row, args.confetti_env, args.offline)),
         ("2. Decisioned application", application_point(row, obs)),
         ("3. Agreement inputs", agreement_inputs_point(row, obs)),
         ("4. Rendered agreement", rendered_point(row, rendered)),
         ("5. CSP labels", csp_point(row, obs)),
-        ("RPF (orthogonal to the five)", rpf_point(row, obs)),
     ]
+    rpf_rows = rpf_point(row, obs)
 
+    # RPF counts toward the overall verdict/exit code exactly as before the --json split: an
+    # unanswered RPF point still fails the Run (module docstring: "An uncaptured point is not a
+    # pass"). Only the JSON structure keeps it in its own "rpf" key, separate from "points" -
+    # that split is for run_validation.py's Manifest assertions (RPF is documented as not
+    # blocking the cma Surface's own pass/fail there), not a change to what this script reports.
+    all_points = core_points + [("RPF (orthogonal to the five)", rpf_rows)]
     failed, missing = [], []
-    for title, rows in points:
-        render(title, rows)
-        print()
+    for title, rows in all_points:
         failed += ["%s / %s" % (title, r[0]) for r in rows if r[1] == FAIL]
         missing += ["%s / %s" % (title, r[0]) for r in rows
                     if r[1] in (MISSING, UNVERIFIABLE)]
+
+    if args.json:
+        def _row(r):
+            label, status, expected, actual = r
+            return {"label": label, "status": status, "expected": expected, "actual": actual,
+                    "passed": status == PASS}
+
+        result = {
+            "code": row["code"], "role": row["role"], "ticket": row["ticket"],
+            "summary_box": summary_box_for(row),
+            "points": [{"title": t, "rows": [_row(r) for r in rows]} for t, rows in core_points],
+            "rpf": {"title": "RPF (orthogonal to the five)", "rows": [_row(r) for r in rpf_rows]},
+            "failed": failed,
+            "missing": missing,
+            "verdict": "passed" if not failed and not missing else "failed" if failed else "incomplete",
+        }
+        print(json.dumps(result, indent=2, default=str))
+        return 0 if not failed and not missing else 1
+
+    print("Run %s (%s, ticket %s), summary box %s\n"
+          % (row["code"], row["role"], row["ticket"], summary_box_for(row)))
+    for title, rows in all_points:
+        render(title, rows)
+        print()
 
     print("verdict: %d failed, %d not captured" % (len(failed), len(missing)))
     for name in failed:

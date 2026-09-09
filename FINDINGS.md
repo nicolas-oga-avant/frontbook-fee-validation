@@ -1147,3 +1147,26 @@ mapped strategy `7M83` as expected. Add this call to every MLA-forced Run betwee
 approval step and `LocalMlaStub.verify!` in `surfaces/cma.md` Step 4 - it does not touch
 `mla_customer?`, pricing-strategy resolution or the render path, so it does not weaken DESIGN
 decision 7's guarantee.
+
+## 38. The standalone CDP client's first navigation can time out on a cold Chrome launch
+
+**Symptom.** `scripts/run_apply_standalone.py`/`scripts/run_validation.py` raised
+`SubmitFailed: never reached #/personal within 20s of navigating - stuck at 'about:blank'` on one
+run of `0122`, immediately after a fresh `Browser.launch()`. The identical command against the
+identical stack state succeeded on the next attempt (`apply_driver.py`'s own `stage_timeout=20`
+default, unchanged).
+
+**Not (yet) root-caused.** Each `Browser.launch()` starts a brand-new Chrome process against a
+brand-new throwaway `--user-data-dir` (`scripts/cdp/client.py:Browser.__init__`) - unlike
+browser-harness, which reuses one long-lived Chrome instance across Runs. A cold process plus an
+empty profile is the obvious suspect for the extra latency before the app's first paint, but this
+was observed once and not measured; it could equally be a one-off slow response from the local
+`web` container. Do not treat "cold profile" as confirmed cause on the strength of one sample.
+
+**Mitigation until root-caused.** Two options, neither applied yet: raise
+`stage_timeout`/`redirect_timeout` past their `apply_driver.run_apply()` defaults (20s/25s) when
+calling through the standalone client specifically, or have `scripts/run_validation.py` retry the
+apply phase once on a `SubmitFailed` whose diagnostic shows `stuck at 'about:blank'` (a real
+validation failure - a stage genuinely blocked mid-flow - looks nothing like this, so a narrow
+retry on exactly this signature would not mask a real Mechanical or Assertion Failure). Neither is
+implemented: this Run's retry was manual.
