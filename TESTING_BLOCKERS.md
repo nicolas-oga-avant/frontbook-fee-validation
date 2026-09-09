@@ -61,16 +61,48 @@ detect approval automatically. Design agreed 2026-09-08:
 STATUS: NEEDS RE-CHECK once implemented and again whenever CSRV-5895 actually lands - the 8-code /
 deployed-SHA facts above are dated 2026-09-08 and will drift.
 
-## 3. schumer_box_apply blocked on CSRV-5843 + CSRV-5844 - OPEN, same shape as item 1, worth re-checking
+## 3. schumer_box_apply blocked on CSRV-5843 + CSRV-5844 - RESOLVED, not blocked; needs a local override
 
-Stub (`surfaces/schumer_box_apply.md`) says blocked on both tickets. CSRV-5843 (CAF Schumer box code)
-is **merged, not deployed**; CSRV-5844 (`react_index_url` bump) is **To Do, not started**. But
-CSRV-5879's own technical notes say the pre-deploy test is "point `react_index_url` at the CAF preview
-bundle" - i.e. there may be a preview-bundle path that does not need CSRV-5844 to ship at all, the
-same way the CMA draft never needed CSRV-5299/5895 to ship. Not yet verified either way.
+Stub (`surfaces/schumer_box_apply.md`) says blocked on both tickets. Walked down 2026-09-09:
 
-Next step: find out whether a CAF preview bundle actually exists and is reachable today, the same way
-the TemplateFlow draft was reachable via `allow_unapproved`.
+- **CSRV-5843 is merged** (CAF `customer-application-frontend` PR #168, merged 2026-09-04 16:24 UTC,
+  auto-cut `v11.5.0`). Not "In Progress" - `ROADMAP.md`'s line to that effect is stale.
+- **CSRV-5844 is To Do**, and per its 2026-09-08 comment is blocked on a manual step - the CAF
+  Production deploy workflow hasn't run since 2026-07-09 - not on CSRV-5843's merge. It is also
+  scoped to the **`mp`** branch's `v/7.0` configs only (Flavio Muller in Slack, 2026-09-08); the
+  `main`-side `v/6.1` bump this repo's Surface actually reads is explicitly **out of scope** for
+  that ticket. Separate gap, tracked, does not block this item.
+- **The "must wait for launch day" premise is wrong.** CSRV-5879's own Launch order puts "CAF release
+  published, react_index_url bumped" at step 3, deliberately *before* step 6 ("the two Confetti
+  keypaths promoted to prd"), which its technical notes say is last *because* that promotion is what
+  actually exposes a new-fee strategy to a real applicant. Deploying CSRV-5843 today is safe and
+  intended pre-launch - it changes nothing for current traffic because `pricing_strategy_param_to_id`
+  (the key that would route a real applicant onto one of the 8 new codes) isn't in prod yet, and
+  `roll_pricing_strategy_configuration` still rolls 100% to `0120` regardless (same shape as item 2,
+  one hop upstream). So there is no policy embargo to work around - only an operational lag (no
+  owner/date on the CAF prod-deploy run) that is another team's domain and not on this team's
+  timeline, so testing still cannot depend on it landing before a Run is needed.
+
+**Pre-deploy path confirmed live 2026-09-09.** CAF's "Dev deploy" workflow runs on every
+`pull_request` event (never on merge to `master`) and publishes a preview build to CloudFront's dev
+distribution keyed by PR number. PR #168's build is still up:
+
+```
+https://d1gm0t5fpu3i9c.cloudfront.net/micro_frontends/168/index.html   -> curled just now, HTTP 200
+```
+
+This is the "CAF preview bundle" CSRV-5879's technical notes and FINDINGS #35 / ROADMAP 1.7 already
+named as the intended pre-deploy path. Resolution: point `main`'s
+`config/customer_application/us_avantcredit_credit_card/v/6.1/version_config.yml` `react_index_url`
+at that URL as an **untracked local-stack override** (hard rule 4/7) - not a dependency on CSRV-5844
+or on CAF's prod-deploy schedule.
+
+**Caveat, not yet built:** the override file itself (`local-stack/` copy of `version_config.yml` +
+a `restore()` line in `restore.sh`) doesn't exist yet - this session only confirmed the path is
+viable. The preview bundle is an ephemeral CI artifact on the dev distribution with no retention
+guarantee, owned by another team's pipeline - **assert it 200s at the start of every Run** rather
+than assuming it persists; a 404 here is a halt-and-report (hard rule/"assume silence means
+failure"), not a fallback to old content.
 
 ## 4. schumer_box_landing blocked on CSRV-5845 + CSRV-5846 - OPEN, same shape as item 3
 
