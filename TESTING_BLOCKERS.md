@@ -69,11 +69,18 @@ Jira status Blocked, not started. CSRV-5879's technical notes say the pre-deploy
 preview plus the avant-redesign preview deploy" - possibly testable via preview paths without either
 ticket's production deploy. Not yet verified.
 
-## 5. predecisioned_terms / schumer_box_basic "not yet implemented" - OPEN, but not blocked on anyone else
+## 5. predecisioned_terms - RESOLVED, built; schumer_box_basic - OPEN, same shape as item 4
 
-No external ticket blocks these two - they are just unbuilt in this repo's harness
-(`surfaces/predecisioned_terms.md`, `surfaces/schumer_box_basic.md`). Backlog item, not a real
-blocker. Listed here so it does not get mistaken for one during grilling.
+- `predecisioned_terms`: built and runs today, piggybacked on `cma`'s Layer 1 value-table assertion
+  - nothing separate to walk. FINDINGS #34: the surface itself exposes no foreign transaction fee
+  key and pins `maximum_late_fee` to the constant `35.0`; a gap in what *product* discloses, not a
+  harness gap. Tracked against CSRV-5841 (In Progress - adds `late_fee_initial`,
+  `late_fee_subsequent`, `foreign_transaction_fee`); re-check this item when it merges.
+- `schumer_box_basic`: checker (`scripts/assert_schumer_box.py`) is implemented and proven (run
+  2026-09-03 against the `schumer_box_apply` capture, same document shape). Blocked because
+  FINDINGS #35: `/schumer_box/<uuid>` has no route on `main` at all - it exists only on `origin/mp`,
+  and this repo works off `main` (AGENTS.md hard rule 7). Waiting on trunk state, not a backlog gap.
+  Record `blocked`, not `not_implemented`, per `surfaces/schumer_box_basic.md`.
 
 ## 6. CSRV-5823 (Confetti prd promotion: param-to-id + apr-caps) - OPEN, confirm what it actually gates
 
