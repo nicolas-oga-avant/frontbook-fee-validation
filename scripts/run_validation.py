@@ -1,4 +1,4 @@
-"""One script call for a full cma-Surface Run: apply -> approve/issue/render -> assert -> record.
+"""One script call for a Run: apply -> approve/issue/render -> assert -> record.
 
 Chains four pieces that already work independently and were each verified live on their own:
 
@@ -16,7 +16,10 @@ exactly as reported, never retried or reinterpreted. A raised exception anywhere
 console phase is a Mechanical Failure by definition - it is recorded `halted`, not silently
 swallowed, and always re-raised to the caller (assume silence means failure).
 
-Scope: the `cma` Surface only. The other four Surfaces are not wired in here - see
+Scope: `cma` and `predecisioned_terms`, from one applied application - per
+surfaces/predecisioned_terms.md, that Surface IS assert_value_table.py's point "2. Decisioned
+application", already computed here, just never recorded under its own name until now. The other
+three Surfaces (schumer_box_*) are not wired in here - see
 .claude/skills/test-frontbook-fee-launch/SKILL.md for what still needs a human/LLM per Surface.
 """
 
@@ -116,9 +119,17 @@ def run_assertions(code, observations_path, rendered_path, confetti_env):
                                    "stderr:\n%s" % (r.returncode, r.stderr[-4000:]))
 
 
-def record_result(code, status, attempt_json, blocked_on=None):
-    manifest_mod.record(code, "cma", status,
+def record_result(code, surface, status, attempt_json, blocked_on=None):
+    manifest_mod.record(code, surface, status,
                         attempt_json=json.dumps(attempt_json), blocked_on=blocked_on)
+
+
+def _status_for(rows):
+    return "passed" if all(r["passed"] for r in rows) else "failed"
+
+
+def _point(report, prefix):
+    return next(p for p in report["points"] if p["title"].startswith(prefix))
 
 
 def main():
@@ -178,11 +189,14 @@ def main():
         message = e.message if isinstance(e, RunFailed) else "%s: %s" % (type(e).__name__, e)
         print("HALTED at %s: %s" % (stage, message), file=sys.stderr)
         if not args.skip_manifest:
-            record_result(args.code, "halted", {
-                "stage": stage,
-                "provenance": {},
-                "failure": {"class": "mechanical", "message": message},
-            })
+            # Both Surfaces share this one applied application (surfaces/predecisioned_terms.md)
+            # - a halt before assertion ran denies evidence to both equally.
+            for surface in ("cma", "predecisioned_terms"):
+                record_result(args.code, surface, "halted", {
+                    "stage": stage,
+                    "provenance": {},
+                    "failure": {"class": "mechanical", "message": message},
+                })
         raise
 
     # Status is derived from the 25 core assertions only, matching manifest.py's own
@@ -195,30 +209,43 @@ def main():
     # the precedent already in data/manifest.json: prior `passed` Attempts for this same code
     # carry 25/25 with RPF equally uncaptured.
     assertions = [row for point in report["points"] for row in point["rows"]]
-    status = "passed" if all(a["passed"] for a in assertions) else "failed"
+    status = _status_for(assertions)
+
+    # predecisioned_terms IS point "2. Decisioned application" (surfaces/predecisioned_terms.md)
+    # - same run, same evidence, already computed above. A separate, smaller assertions list and
+    # its own (possibly different) status: a bug isolated to the render, say, could leave
+    # predecisioned_terms passing while cma fails, or vice versa - each Surface's status must be
+    # derived only from its own point, never borrowed from the other's.
+    pt_assertions = _point(report, "2.")["rows"]
+    pt_status = _status_for(pt_assertions)
 
     print()
-    print("verdict: %s (%d/%d core assertions passed%s)" % (
+    print("verdict: cma=%s (%d/%d), predecisioned_terms=%s (%d/%d)%s" % (
         status, sum(1 for a in assertions if a["passed"]), len(assertions),
-        " - RPF not verifiable on this stack, FINDINGS #36, does not block this Surface"
+        pt_status, sum(1 for a in pt_assertions if a["passed"]), len(pt_assertions),
+        " - RPF not verifiable on this stack, FINDINGS #36, does not block either Surface"
         if report["rpf"]["rows"][0]["status"] != "PASS" else ""))
 
+    provenance = {
+        "templateflow_host": console_result["provenance"]["templateflow_host"],
+        "template_version": console_result["provenance"]["template_version_id"],
+        "render_mode": console_result["provenance"]["render_mode"],
+    }
+    evidence_dir_rel = "evidence/run-%s/" % args.code
+
     if not args.skip_manifest:
-        record_result(args.code, status, {
-            "stage": "asserted",
-            "provenance": {
-                "templateflow_host": console_result["provenance"]["templateflow_host"],
-                "template_version": console_result["provenance"]["template_version_id"],
-                "render_mode": console_result["provenance"]["render_mode"],
-            },
-            "evidence_dir": "evidence/run-%s/" % args.code,
-            "assertions": assertions,
-            "rpf": report["rpf"],
+        record_result(args.code, "cma", status, {
+            "stage": "asserted", "provenance": provenance, "evidence_dir": evidence_dir_rel,
+            "assertions": assertions, "rpf": report["rpf"],
+        })
+        record_result(args.code, "predecisioned_terms", pt_status, {
+            "stage": "asserted", "provenance": provenance, "evidence_dir": evidence_dir_rel,
+            "assertions": pt_assertions,
         })
     else:
         print("(--skip-manifest: not recorded)")
 
-    return 0 if status == "passed" else 1
+    return 0 if status == "passed" and pt_status == "passed" else 1
 
 
 if __name__ == "__main__":
