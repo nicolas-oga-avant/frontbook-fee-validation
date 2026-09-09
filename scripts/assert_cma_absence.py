@@ -24,8 +24,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from redline_text import (REDLINE_PATH, SUMMARY_ROW_BACKBOOK as SUMMARY_ROW, flatten,
-                          sentence)
+from redline_text import (REDLINE_PATH, SUMMARY_ROW_BACKBOOK as SUMMARY_ROW, dollar_present,
+                          flatten, sentence)
 
 
 def checks(text, late_fee_initial, late_fee_subsequent, ftf, redline_path=None):
@@ -50,7 +50,8 @@ def checks(text, late_fee_initial, late_fee_subsequent, ftf, redline_path=None):
          "Any conversion rate costs resulting from" not in text),
         ("NO '%s%% of each foreign transaction'" % ftf,
          "%s%% of each foreign transaction" % ftf not in text),
-        ("NO frontbook late fee amounts", "$30" not in text and "$41" not in text),
+        ("NO frontbook late fee amounts",
+         not dollar_present(text, "30") and not dollar_present(text, "41")),
     ]
 
 

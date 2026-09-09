@@ -9,8 +9,13 @@ Proves that a card issued under a given pricing strategy shows the right fees on
 CSRV-5300 asks for, not only the cardmember agreement. Epic CSRV-4119: late fee $28/$39 -> $30/$41,
 plus a new 3% foreign transaction fee, on frontbook codes only.
 
-**You drive this.** Setup is scripted; the browser walk is yours, through browser-harness. A
-deterministic replacement for the browser phase is planned - until then expect this to cost tokens.
+**You drive this, but not stage by stage.** Setup is scripted, and as of 2026-09-09 so is the apply
+walk and the console phase: `scripts/apply_driver.py` (browser, via browser-harness) and
+`scripts/console_runner.rb` (Rails) each run their whole phase in one call instead of one call per
+stage - see `surfaces/cma.md` Steps 3-4. What is still yours: picking the code, reading the result,
+deciding what a `SubmitFailed` or a Ruby exception means, and driving a stage by hand when one of
+them raises. `ROADMAP.md` 2.1 tracks what full Phase 2 (a standalone CDP client, zero tool calls)
+still needs beyond this.
 
 ## Before anything: the one rule
 

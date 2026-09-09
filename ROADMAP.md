@@ -55,19 +55,19 @@ Provenance is the Template ID **and** the `template_version_uuid` the render ret
 alone does not say which template it is a version of. No `git_sha_version` exists anywhere yet
 (FINDINGS #18).
 
-## Dependency state as of 2026-09-02
+## Dependency state as of 2026-09-09
 
 | Dependency | State |
 | --- | --- |
 | avant-basic#5928 (CSRV-5298, `cma_fee_terms`) | **Merged** 2026-08-28 into `main` |
 | avant-templates#74 (CSRV-5299, CMA content) | **Open, draft**, base `main` |
-| Production CMA draft (template 9658, consolidated) | **v7 draft carries the new fee content** (FINDINGS #21) |
+| Production CMA template (9658, consolidated) | **v7 approved** (CSRV-5895 landed) - renders now come back `render_mode: approved`; see `TESTING_BLOCKERS.md` item 2 |
 | CSRV-4904 (template extraction to git-backed Liquid) | Merged |
 | Confetti `basic.pricing_strategy` (fees) | v17, dev and prd |
 | Confetti param-to-id / apr-caps (+8 UUIDs) | dev only; prd promotion deferred to CSRV-5823 |
 | Optimizely RPF audience + staging fee amounts | done, both environments |
-| CSRV-5841 (avant-basic: fee terms into `predecisioned_terms`) | **In Progress** - gates CSRV-5843's data (FINDINGS #34) |
-| CSRV-5843 (CAF `SchumerBox.tsx`) | **In Progress** - gates the new amounts in the in-flow box |
+| CSRV-5841 (avant-basic: fee terms into `predecisioned_terms`) | **Merged** - `predecisioned_terms` discloses all three keys (FINDINGS #34) |
+| CSRV-5843 (CAF `SchumerBox.tsx`) | **Merged**, not yet deployed - blocked on CSRV-5844's operational lag, not development (`TESTING_BLOCKERS.md` item 3) |
 | CSRV-5844 (avant-basic `react_index_url` bump to that CAF release) | **Created**, not started - gates delivery, not development (see 1.7) |
 | CSRV-5845 (avant-redesign landing-page disclosure) | **In Progress** - gates the Contentful surface |
 | CSRV-5846 (Contentful: 8 new landing pages) | **Created**, not started - gates it too |
@@ -76,7 +76,8 @@ alone does not say which template it is a version of. No `git_sha_version` exist
 existed. Fee content is gated on the *presence* of Confetti-supplied variables (FINDINGS #9).
 
 The baseline render in `evidence/baseline/` shows $28/$39 and no FX fee. That is **correct** - it is
-a verified pre-change render, and it should flip to $30/$41/3% once the new template version is live.
+a verified pre-change render, from before the new template version (now approved, item 2) went
+live. `evidence/run-7M83/` shows the flip: $30/$41/3% on the same template.
 
 ---
 
@@ -451,8 +452,13 @@ harness no longer assumes it.
 
 ### 1.9 Done when
 
-- [ ] A teammate with only this repo runs the skill and validates `0122` and `0120` unaided
-- [ ] For one Pair, **all five surfaces** captured and asserted, not just the agreement
+- [ ] A teammate with only this repo runs the skill and validates `0122` and `0120` unaided. Apply
+      + console phases are scripted (`scripts/apply_driver.py`, `scripts/console_runner.rb`); not
+      yet tried by an actual human
+- [ ] For one Pair, **all five surfaces** captured and asserted, not just the agreement.
+      `0122`/`0120`: 3/5 passed (`cma`, `predecisioned_terms`, `schumer_box_apply`); `schumer_box_basic`
+      blocked (no route on `main`, FINDINGS #35) and `schumer_box_landing` blocked (CSRV-5845/5846
+      not shipped) - both platform gaps, not harness gaps
 
 ---
 
@@ -469,12 +475,27 @@ to support.
 ### 2.1 The CDP port
 
 - [ ] `scripts/apply_harness.py` ported from browser-harness helpers to a standalone CDP client.
-      The logic transfers directly: it is already raw CDP calls and JS strings
-- [ ] Own Chrome launched on a debug port; the user's browser never touched
-- [ ] One `Target.createBrowserContext` per Run - a genuinely separate cookie jar, not shared incognito
-- [ ] Stage-change assertion after every step; silent blocks surfaced by blur-then-reread
-- [ ] Application id captured explicitly at creation
-- [ ] Verified zero tokens consumed per Run
+      **Not done** - `scripts/apply_driver.py` still runs on browser-harness's `cdp`/`js`/`wait`;
+      it removes the model from the click-by-click loop, not browser-harness as the transport
+- [ ] Own Chrome launched on a debug port; the user's browser never touched. Still the user's
+      local Chrome via browser-harness
+- [x] One `Target.createBrowserContext` per Run, not shared incognito - `new_incognito_tab()`
+      creates a distinct `browserContextId` per call
+- [x] Stage-change assertion after every step; silent blocks surfaced by blur-then-reread.
+      `apply_harness.py`'s `submit_and_confirm`/`wait_for_stage` poll for the real signal (SPA
+      hash change or genuine `customer_applications` traffic) instead of a fixed `wait(N)`, and
+      raise `SubmitFailed` with `surface_validation()`'s text on timeout. `autofill_stage()`
+      retries its `DEV TOOLS` click for up to 10s rather than giving up instantly, for stages
+      with an async render before their own controls mount (`#/rates_terms`). Verified on
+      `7M82`/`7M83` (MLA) and `0122`/`0120` (direct)
+- [x] Application id captured explicitly at creation - `run_apply()` parses `application_uuid`
+      off the post-password redirect URL; `console_runner.rb` captures `application_id`,
+      `credit_card_account_id` and both agreement log ids off its own objects, never `.last`
+- [ ] Verified zero tokens consumed per Run. Not zero: 1 `browser-harness` call + 1 `rails runner`
+      call per Run (down from ~15). True zero needs the standalone CDP client above
+- [x] The MLA report pull gap (FINDINGS #37) folded in: `console_runner.rb` calls
+      `app.run_transunion_mla_report!(force: true)` before `LocalMlaStub.verify!` whenever
+      `mla_base_code` is passed
 
 ### 2.2 Manifest and provenance
 

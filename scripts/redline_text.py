@@ -47,6 +47,16 @@ def norm(s):
     return re.sub(r"\s+", " ", s).strip()
 
 
+def dollar_present(text, amount):
+    """Whether "$<amount>" appears as a whole dollar figure, not as a substring of a longer
+    one. A bare `"$30" in text` false-positives on "$300" - observed 2026-09-09 in
+    assert_schumer_box.py's "NO frontbook late fee amounts" check, tripped by 0120's
+    minimum-credit-limit disclosure ("...will be $300..."). Same class of bug the module
+    docstring warns about for a bare `'3%' in text`; shared here so a checker cannot
+    reintroduce it separately from the others."""
+    return re.search(r"\$%s(?!\d)" % re.escape(str(amount)), text) is not None
+
+
 def entries(path=None):
     with open(path or REDLINE_PATH) as fh:
         return json.load(fh)["assertions"]

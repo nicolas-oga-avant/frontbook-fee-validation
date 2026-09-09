@@ -22,17 +22,13 @@ tickets this repo exists to close.
 The harness always renders the draft directly off production TemplateFlow (hard rule 3 / ADR 0002),
 so this PR's merge status never matters for testing.
 
-## 2. Template 9658 v7 approval (CSRV-5895) - RESOLVED, safe to approve
+## 2. Template 9658 v7 approval (CSRV-5895) - RESOLVED; landed
 
-Approving is a live production toggle, but the diff is wording-neutral, the fee variables default to
-the old $28/$39/nil values absent Confetti config, and `roll_pricing_strategy_configuration` still
-rolls 100% to `0120` - approving today changes zero current customers.
-
-`zzz_local_render_provenance.rb` checks the approved version's fee variables fresh on every CMA
-render and forces the correct `allow_unapproved` value, halting rather than guessing if the check
-itself fails (FINDINGS #34).
-
-STATUS: NEEDS RE-CHECK whenever CSRV-5895 actually lands, or the 8-code/rollout facts below drift.
+Confirmed landed 2026-09-09: `7M83` and `7M82` both rendered with `render_mode: approved`
+(`allow_unapproved: false`) - the approved version already carries all three fee variables. See
+`evidence/run-7M83/cma_7M83_log2.provenance.json`. No further re-check needed for this item;
+`zzz_local_render_provenance.rb` verifies it fresh on every render regardless, so nothing here can
+go stale again in a way that matters.
 
 ## 3. schumer_box_apply blocked on CSRV-5843 + CSRV-5844 - RESOLVED, not blocked; walked and passing
 
@@ -79,10 +75,9 @@ STATUS: NEEDS RE-CHECK once CSRV-5844, CSRV-5845, or CSRV-5846 ship.
 
 Not yet confirmed whether that status is current relative to what is actually testable today (per
 items 1-6, more may be unblocked than Jira suggests). Worth asking whoever set that status, or
-re-deriving it from the manifest once seeded.
+re-deriving it from `scripts/manifest.py report` - the Manifest is seeded now (item 8).
 
-## 8. data/manifest.json not yet seeded - OPEN, tooling gap not a launch blocker
+## 8. data/manifest.json not yet seeded - RESOLVED
 
-`scripts/manifest.py` and the schema exist, but `data/manifest.json` does not exist yet. No Run has
-been recorded into it; all evidence so far lives in `evidence/run-*/` directories. Needs
-`scripts/manifest.py seed` before the Manifest reflects reality.
+Seeded 2026-09-09. CSRV-5302's Pair (`7M82`/`7M83`) is fully recorded - all four Surfaces that
+apply to an MLA code, both roles. `scripts/manifest.py report <code>` reflects reality now.

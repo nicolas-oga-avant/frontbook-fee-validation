@@ -172,11 +172,14 @@ def application_point(row, obs):
         _check("maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
                35.0, _money(terms.get("maximum_late_fee"))),
         _check("late_fee_initial", _money(want["late_fee_initial"]),
-               _money(terms.get("late_fee_initial"))),
+               _money(terms.get("late_fee_initial")),
+               ok=_money(terms.get("late_fee_initial")) == _money(want["late_fee_initial"])),
         _check("late_fee_subsequent", _money(want["late_fee_subsequent"]),
-               _money(terms.get("late_fee_subsequent"))),
+               _money(terms.get("late_fee_subsequent")),
+               ok=_money(terms.get("late_fee_subsequent")) == _money(want["late_fee_subsequent"])),
         _check("foreign_transaction_fee", _money(want["foreign_transaction_fee"]),
-               _money(terms.get("foreign_transaction_fee"))),
+               _money(terms.get("foreign_transaction_fee")),
+               ok=_money(terms.get("foreign_transaction_fee")) == _money(want["foreign_transaction_fee"])),
     ]
 
 

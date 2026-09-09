@@ -1,5 +1,6 @@
-# Campaign output: regenerated per run, not source
-evidence/runs/
+# Campaign output: regenerated per run, not source. baseline/ and pr-preview/ are kept
+# reference evidence, not per-run output, so they stay tracked.
+evidence/run-*/
 runs/
 *.log
 

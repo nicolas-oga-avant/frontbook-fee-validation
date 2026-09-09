@@ -1104,3 +1104,46 @@ switches the client to the HTTP config manager and a live datafile, or refresh
 `config/optimizely/datafile.json` from the project. Both are real changes to a shared checkout, so
 neither was done here. The first is the right one - the local snapshot going stale is what produced
 this.
+
+## 37. `product.approve!` alone never pulls the TransUnion MLA report - `LocalMlaStub.verify!` fails silently unless you pull it yourself
+
+**Symptom.** On an MLA-forced Run (e.g. `7M83` off base `7213`), `LocalMlaStub.verify!` raises
+immediately after `cca.issue!`, even with the correct last name (`mlaapproved`) set on `#/personal`:
+
+```
+LocalMlaStub::Error: application 1 has no TransUnion MLA report at all, so nothing was forced.
+Was the last name set to mlaapproved before the personal stage was submitted?
+```
+
+`LocalMlaStub.status(app)` confirms it: `mla_report_id: nil, military_lending_act_confirmed: false,
+military_lending_act_relevant: false` - despite `last_name: "mlaapproved"` and
+`mla_strategy: "7M83"` (the mapping itself resolves fine; there is simply no report to confirm it).
+
+**Cause.** The MLA pull is not part of application decisioning or `product.approve!`. It is
+`Avant::Decisioning::Verifications::Actions::PullAllReports`
+(`lib/avant/decisioning/verifications/actions/pull_all_reports.rb:9`, `WORKER_METHODS` includes
+`:run_transunion_mla_report!`), invoked from `VerificationWorker`
+(`app/workers/verification_worker.rb:31`) as part of the **New Verifications** identity-verification
+loop - the same system behind the `/verify/<app_uuid>` redirect the browser walk stops at (FINDINGS
+#32). The sidekiq log shows the verification loop actually running for the application
+(`Verification loop started` ... `refreshing_actions` ... `exiting_loop`), but whatever scoring
+decided which actions were relevant did not include the report pull, so `PullAllReports` never
+fired. `product.approve!` is a local shortcut around the dashboard/verify flow (FINDINGS #17, #32);
+it was never going to run a New Verifications action.
+
+**Fix - not a patch, just the missing call.** Trigger the pull directly; it is an ordinary
+`CustomerApplication` method, and `zzz_local_mla_stub.rb`'s `get_mla_report` patch already intercepts
+it correctly by last name:
+
+```ruby
+app = CustomerApplication.find_by!(uuid: app_uuid)
+app.run_transunion_mla_report!(force: true)   # do this AFTER approve!, BEFORE LocalMlaStub.verify!
+LocalMlaStub.verify!(app, expected_code: CODE)  # now resolves the MLA report and confirms mapping
+```
+
+Verified 2026-09-09 on application 1 / `7M83`: before the call, `mla_report_id: nil`; after,
+`mla_report_id: 2`, `military_lending_act_confirmed: true`, `military_lending_act_relevant: true`,
+mapped strategy `7M83` as expected. Add this call to every MLA-forced Run between `cca.issue!`'s
+approval step and `LocalMlaStub.verify!` in `surfaces/cma.md` Step 4 - it does not touch
+`mla_customer?`, pricing-strategy resolution or the render path, so it does not weaken DESIGN
+decision 7's guarantee.

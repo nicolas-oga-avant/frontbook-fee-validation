@@ -23,6 +23,7 @@ elements where a real mouse event matters. See FINDINGS #31.
 import csv
 import json
 import os
+import time
 
 # The stack this drives. Local by default: dev/Ocala can walk the apply flow but cannot issue
 # a card, so local is the only environment where the chain closes. Override to point at
@@ -342,14 +343,24 @@ def dom_click_text(txt_or_regex, regex=False):
               "return 'clicked ' + e.innerText.trim().slice(0,40); })()" % finder)
 
 
-def autofill_stage():
+def autofill_stage(mount_timeout=10, mount_poll=1):
     """Open dev tools, click this stage's autofill button, close the panel.
 
     Every click here is element.click(): the panel renders off-canvas, and on the stage form
     a coordinate click reports success and does nothing.
+
+    Retries the DEV TOOLS click for up to `mount_timeout` seconds before giving up: a stage
+    reached via a hash change is not necessarily mounted yet - some stages compute something
+    (e.g. rates_terms' credit limit) before rendering their own controls, and a driver with no
+    human/LLM think-time between the hash flip and this call can race that render. A manual
+    walk never hit this because reading the previous step's output was itself enough delay;
+    a deterministic driver needs to wait for the same thing explicitly instead of by accident.
     """
-    if "clicked" not in dom_click_text("DEV TOOLS"):
-        return "no dev tools"
+    deadline = time.time() + mount_timeout
+    while "clicked" not in dom_click_text("DEV TOOLS"):
+        if time.time() >= deadline:
+            return "no dev tools"
+        wait(mount_poll)
     wait(2)
     names = json.loads(js(
         "JSON.stringify([...document.querySelectorAll('button')]"
@@ -407,6 +418,89 @@ def submitted_for_real(events):
         if "customer_applications" in u:
             real.append((e["params"]["response"].get("status"), u.rsplit("/", 1)[-1]))
     return real
+
+
+# --- deterministic driving --------------------------------------------------------------
+#
+# The functions above are all a human (or an LLM) drove by hand, checking state between
+# each call. These two make that unnecessary: they poll for the actual signal a step
+# succeeded - the SPA's hash advancing, or real API traffic landing - instead of a fixed
+# `wait(N)` and a look. A fixed wait is exactly what produced the false "no-op" reads during
+# manual driving (2026-09-09, strategy 7M83): the submit had genuinely succeeded, but the
+# hash had not yet flipped by the time a 3-second wait ended. Polling removes that race
+# without weakening the check - `submit_and_confirm` still raises, with the page's own
+# validation text attached, if a stage is genuinely and permanently blocked.
+
+class SubmitFailed(Exception):
+    """A stage did not advance and no real API traffic was seen, within the timeout. Carries
+    the surfaced validation text so the caller does not have to reconnect to look."""
+
+
+def wait_for_stage(expected, timeout=20, poll=0.5):
+    """Poll stage() until it equals `expected`. Returns whatever stage was last observed,
+    which is `expected` on success and something else on timeout - check the return value or
+    let the caller that needs a hard failure use submit_and_confirm instead."""
+    deadline = time.time() + timeout
+    last = stage()
+    while time.time() < deadline:
+        last = stage()
+        if last == expected:
+            return last
+        wait(poll)
+    return last
+
+
+def submit_and_confirm(next_stage=None, timeout=20, poll=0.5):
+    """Click the stage's submit button and don't return until it is confirmed - either real
+    customer_applications traffic landed, or (if given) the SPA reached `next_stage`.
+
+    Raises SubmitFailed, with `surface_validation()`'s output attached, if neither happens
+    before the timeout. This is what makes a blocked stage loud: every one of the traps in
+    the module docstring above produces a click that "succeeds" (no exception from the click
+    itself) and a page that never moves, which looks identical to a slow success unless
+    something is actually watching for the difference.
+    """
+    start_stage = stage()
+    drain_events()
+    click_result = submit_stage()
+    if click_result in ("no submit button", "submit button disabled"):
+        raise SubmitFailed("stage %r: submit_stage() returned %r" % (start_stage, click_result))
+
+    deadline = time.time() + timeout
+    real = []
+    reached = start_stage
+    while time.time() < deadline:
+        wait(poll)
+        real += submitted_for_real(drain_events())
+        reached = stage()
+        if next_stage:
+            if reached == next_stage:
+                return {"stage": reached, "real_calls": real}
+        elif real:
+            return {"stage": reached, "real_calls": real}
+
+    diag = surface_validation()
+    raise SubmitFailed(
+        "stage %r did not advance (still %r) within %ss - real_calls=%r validation_text=%r"
+        % (start_stage, reached, timeout, real, diag)
+    )
+
+
+def wait_for_external_redirect(host_substring, timeout=25, poll=0.5):
+    """Poll the tab's own URL for a navigation off-origin, e.g. the post-password redirect
+    to the staging verify app this stack does not run. Real navigation, not a hash change -
+    stage() does not apply here."""
+    deadline = time.time() + timeout
+    url = page_info()["url"]
+    while time.time() < deadline:
+        url = page_info()["url"]
+        if host_substring in url:
+            return url
+        wait(poll)
+    raise SubmitFailed(
+        "never redirected to a url containing %r within %ss - last url %r"
+        % (host_substring, timeout, url)
+    )
 
 
 # --- CSP verification ------------------------------------------------------------------

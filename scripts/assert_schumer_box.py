@@ -28,8 +28,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from redline_text import flatten, load_row, own_amounts, partner_amounts, sentence, \
-    summary_box_for
+from redline_text import dollar_present, flatten, load_row, own_amounts, partner_amounts, \
+    sentence, summary_box_for
 
 # Text a rendered box always carries, whichever surface it came from and whichever code it
 # is for. Absence checks against a page that failed to render pass perfectly, so the box has
@@ -86,8 +86,8 @@ def checks(text, row):
              any(ftf_backbook in w for w in windows)),
             ("NO %r" % ftf_row, ftf_row not in text),
             ("NO frontbook late fee amounts",
-             "$%s" % front["late_fee_initial"] not in text
-             and "$%s" % front["late_fee_subsequent"] not in text),
+             not dollar_present(text, front["late_fee_initial"])
+             and not dollar_present(text, front["late_fee_subsequent"])),
         ]
     return rows
 

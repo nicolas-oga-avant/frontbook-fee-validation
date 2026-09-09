@@ -5,7 +5,23 @@ Requires `SKILL.md` Steps 1-2 done first (stack up, code and expectations loaded
 
 ## Step 3 - Apply, in the browser
 
-Load `scripts/apply_harness.py` into browser-harness. Every workaround in it exists because of an
+**Fast path (2026-09-09):** `scripts/apply_driver.py` runs this whole step deterministically - no
+per-stage driving, no LLM deciding what to click. It reuses every helper and every workaround
+below; only the waiting changed (polling for the real signal instead of a fixed `wait(N)` and a
+look - see `apply_harness.py`'s "deterministic driving" section for why that mattered).
+
+```bash
+CODE=7M83 PASSWORD='...' bash -c 'cat scripts/apply_harness.py scripts/apply_driver.py | browser-harness'
+```
+
+Prints `application_uuid` (and everything else Step 4 needs) between `APPLY_RESULT_JSON_START` /
+`_END` markers, and writes the same JSON to `evidence/run-<CODE>/apply_result.json`. Raises
+`SubmitFailed` with the page's own validation text attached if a stage does not confirm - that is
+the moment to drop to the manual walk below and see what actually changed, not to retry the script
+blindly.
+
+**Manual walk (fallback, and the reference for what the script above encodes):** Load
+`scripts/apply_harness.py` into browser-harness. Every workaround in it exists because of an
 observed failure; read its module docstring first.
 
 ```
@@ -74,6 +90,21 @@ If only `google` / `doubleclick` / `facebook` requests fire, the form never subm
 
 ## Step 4 - Issue and render, in the console
 
+**Fast path (2026-09-09):** `scripts/console_runner.rb` is everything below in one script. Copy it
+in and run it once with the code, the `application_uuid` Step 3 gave you, and (MLA Runs only) the
+base code:
+
+```bash
+docker compose -p "$BASIC_PROJECT" cp scripts/console_runner.rb web:/usr/src/app/tmp/console_runner.rb
+docker compose -p "$BASIC_PROJECT" exec -T web bundle exec rails runner /usr/src/app/tmp/console_runner.rb \
+    <CODE> <application_uuid> [<mla_base_code>]
+```
+
+Prints `credit_card_account_id`, both agreement log ids, the render provenance and the
+observations file path between `CONSOLE_RESULT_JSON_START`/`_END`. It raises whatever Ruby raised
+on any step - that exception is the evidence; do not rescue it away. Read on for what it runs and
+why, or to drive it by hand if something in it needs to be re-diagnosed.
+
 Run against basic:
 
 ```bash
@@ -88,7 +119,14 @@ unrelated-looking.
 ```ruby
 OptimizelyInitializer.setup!
 
-# On an MLA Run, first prove the forcing took. It is silent when it does not: the account simply
+# On an MLA Run, the TransUnion MLA report is not pulled by product.approve! - that only happens
+# in the New Verifications identity-verification loop (PullAllReports, behind the /verify/<uuid>
+# redirect this stack does not run). Pull it explicitly first, or verify! raises "no TransUnion
+# MLA report at all" even with the right last name set (FINDINGS #37).
+app = CustomerApplication.find_by!(uuid: "<app_uuid>")   # or CustomerApplication.find(<application_id>)
+app.run_transunion_mla_report!(force: true)
+
+# Now prove the forcing took. It is silent when it does not: the account simply
 # opens under the base code and the Run reports frontbook amounts for a code nobody asked about.
 LocalMlaStub.verify!(<application_id>, expected_code: "<CODE>")
 
