@@ -474,11 +474,20 @@ to support.
 
 ### 2.1 The CDP port
 
-- [ ] `scripts/apply_harness.py` ported from browser-harness helpers to a standalone CDP client.
-      **Not done** - `scripts/apply_driver.py` still runs on browser-harness's `cdp`/`js`/`wait`;
-      it removes the model from the click-by-click loop, not browser-harness as the transport
-- [ ] Own Chrome launched on a debug port; the user's browser never touched. Still the user's
-      local Chrome via browser-harness
+- [x] `scripts/apply_harness.py` ported from browser-harness helpers to a standalone CDP client.
+      `scripts/cdp/` (`ws.py` + `client.py`) is a stdlib-only CDP transport implementing the
+      eleven names apply_harness.py/apply_driver.py call (`js`, `cdp`, `click_at_xy`,
+      `page_info`, `goto_url`, `wait`, `wait_for_load`, `switch_tab`, `press_key`,
+      `drain_events`, `new_tab`); `scripts/run_apply_standalone.py` execs both files UNCHANGED
+      into a namespace bound to it - neither file was touched. Verified live 2026-09-09: `python3
+      scripts/run_apply_standalone.py 0122` walked a real application against the local stack
+      with zero browser-harness tool calls - all three stages confirmed by real
+      `customer_applications` traffic (not a fixed wait), `application_uuid` captured explicitly
+      off the post-password redirect (never `.last`), account-opening Schumer box captured as a
+      side effect of the walk. Evidence: `evidence/run-0122/apply_result.json`
+- [x] Own Chrome launched on a debug port; the user's browser never touched. Implemented in
+      `scripts/cdp/client.py:Browser.launch()` - own process, own ephemeral port, own throwaway
+      `--user-data-dir`, torn down on exit. Confirmed live in the same 0122 run above
 - [x] One `Target.createBrowserContext` per Run, not shared incognito - `new_incognito_tab()`
       creates a distinct `browserContextId` per call
 - [x] Stage-change assertion after every step; silent blocks surfaced by blur-then-reread.
@@ -491,8 +500,17 @@ to support.
 - [x] Application id captured explicitly at creation - `run_apply()` parses `application_uuid`
       off the post-password redirect URL; `console_runner.rb` captures `application_id`,
       `credit_card_account_id` and both agreement log ids off its own objects, never `.last`
-- [ ] Verified zero tokens consumed per Run. Not zero: 1 `browser-harness` call + 1 `rails runner`
-      call per Run (down from ~15). True zero needs the standalone CDP client above
+- [ ] Verified zero tokens consumed per Run. `scripts/run_apply_standalone.py` removes the
+      `browser-harness` tool call entirely (down to 1 `rails runner` call per Run, from ~15).
+      Live-verified 2026-09-09 for 0122: applied through the standalone client, then
+      `console_runner.rb` (approve/issue/render, unchanged) and `assert_value_table.py` against
+      the result gave **25/25 assertions passing - identical count, identical
+      `template_version_id` (`bd8382f5-...`), identical verdict** to the `passed` Attempt already
+      in `data/manifest.json` from the browser-harness-driven Run. Not re-recorded on the
+      Manifest: same code, same template version, already `passed` (SKILL.md: don't re-run what
+      report already shows passed) - this Run existed to prove the transport, not add coverage.
+      Box stays unchecked because the `rails runner` call is still a separate manual step, not
+      chained by one script yet (that is 2.3's orchestrator, not built)
 - [x] The MLA report pull gap (FINDINGS #37) folded in: `console_runner.rb` calls
       `app.run_transunion_mla_report!(force: true)` before `LocalMlaStub.verify!` whenever
       `mla_base_code` is passed
