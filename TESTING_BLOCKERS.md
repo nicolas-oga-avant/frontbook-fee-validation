@@ -72,10 +72,12 @@ ticket's production deploy. Not yet verified.
 ## 5. predecisioned_terms - RESOLVED, built; schumer_box_basic - OPEN, same shape as item 4
 
 - `predecisioned_terms`: built and runs today, piggybacked on `cma`'s Layer 1 value-table assertion
-  - nothing separate to walk. FINDINGS #34: the surface itself exposes no foreign transaction fee
-  key and pins `maximum_late_fee` to the constant `35.0`; a gap in what *product* discloses, not a
-  harness gap. Tracked against CSRV-5841 (In Progress - adds `late_fee_initial`,
-  `late_fee_subsequent`, `foreign_transaction_fee`); re-check this item when it merges.
+  - nothing separate to walk. `late_fee_initial`, `late_fee_subsequent` and
+  `foreign_transaction_fee` are real, strategy-derived keys on `predecisioned_terms` (CSRV-5841,
+  Jira status Merged, confirmed on the worktree at commit `d8b53c0`). `assert_value_table.py`'s
+  `application_point` asserts those three against the matrix (FINDINGS #34). `maximum_late_fee` is
+  a separate, unrelated key that stays pinned to the policy constant `35.0` on every code - not the
+  launch's mechanism.
 - `schumer_box_basic`: checker (`scripts/assert_schumer_box.py`) is implemented and proven (run
   2026-09-03 against the `schumer_box_apply` capture, same document shape). Blocked because
   FINDINGS #35: `/schumer_box/<uuid>` has no route on `main` at all - it exists only on `origin/mp`,

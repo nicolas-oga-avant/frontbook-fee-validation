@@ -958,43 +958,23 @@ customer whose application declines.
 The one-line `avant-basic` defect in FINDINGS #3 is still real and still unowned, but it is not what
 blocks MLA testing, and fixing it would not have unblocked anything.
 
-## 34. `predecisioned_terms` carries no fee-launch amount at all
+## 34. `predecisioned_terms` fee-launch keys
 
-**Symptom.** The application-time surface the ticket names for the 12 MLA codes turns out to
-disclose neither of the two fees the launch changes. An assertion written from the ticket's wording
-- "read `predecisioned_terms` and assert late fees, FX fee, APR, annual fees" - fails on every Run,
-frontbook and backbook alike, against a correct template.
+`Avant::Decisioning::Interface::Card::Base#predecisioned_terms`
+(`lib/avant/decisioning/interface/card/base.rb:22-41`) carries `late_fee_initial`,
+`late_fee_subsequent` and `foreign_transaction_fee` (CSRV-5841), each read via
+`application.policy.pricing_strategies&.dig(pricing_strategy_id, ...)` and nil for a strategy that
+configures none of them. `maximum_late_fee` is a separate key, fixed at the policy constant `35.0`
+on every code and policy version (v1, v4, v5, v6, v7) - not the launch's mechanism.
 
-**Cause.** The hash is built in `Avant::Decisioning::Interface::Card::Base#predecisioned_terms`
-(`lib/avant/decisioning/interface/card/base.rb:22-41`), and its fourteen keys have no foreign
-transaction fee. Its one late fee key is not the schedule:
+`assert_value_table.py`'s `application_point` asserts `late_fee_initial`, `late_fee_subsequent` and
+`foreign_transaction_fee` against the matrix row, the decision path strategy, APR, and both annual
+fees; `maximum_late_fee` is pinned at `35.0` explicitly since that key is unrelated to the launch.
 
-```ruby
-# lib/avant/decisioning/interface/card/base.rb:132
-def predecisioned_maximum_late_fee
-  application.policy.maximum_late_fee     # => 35.0, a constant on every policy version
-end
-```
+Where the fee amounts also reach an application-time surface: the Schumer box - see #35 for what
+that one does with them. CSRV-5843 reads the same three keys there.
 
-`maximum_late_fee` is `35.0` on v1, v4, v5, v6 and v7 alike, and neither subclass under
-`interface/card/unsecured/` overrides it. So `predecisioned_terms[:maximum_late_fee]` is `"35.0"`
-for a `0122` applicant and `"35.0"` for a `0120` one. Verified on `9b603b8` (main, the trunk under
-test), which already contains CSRV-5298.
-
-**What it can still prove.** APR, the annual fees and the minimum credit line, all of which are
-strategy-derived, and the fact that the applicant reached a decision under the code the Run is for.
-`assert_value_table.py`'s application point asserts exactly those and pins the `35.0` explicitly, so
-the gap is recorded on every Run rather than rediscovered.
-
-**Where the fee amounts do reach an application-time surface**: the Schumer box, which is the other
-half of the ticket - and see #35 for what that one does with them.
-
-**This is a result, not a workaround** - and it is already owned. CSRV-5841 adds
-`late_fee_initial`, `late_fee_subsequent` and `foreign_transaction_fee` to `predecisioned_terms`;
-it is In Progress and not on `9b603b8`, which is why the keys are absent here. CSRV-5843 then reads
-them in the Schumer box. So the value table asserts the `35.0` as today's truth, and this finding
-is the thing to re-check when CSRV-5841 merges - at which point the fee amounts become assertable
-on this surface and the expectation here changes.
+Evidence: worktree used for this repo's testing, commit `d8b53c0`.
 
 ## 35. Every Schumer box is strategy-blind on both launch rows
 

@@ -138,11 +138,13 @@ def confetti_point(row, env, offline=False):
 def application_point(row, obs):
     """What the applicant was quoted, read back from the stored applicant data.
 
-    `predecisioned_terms` is the only application-time surface an MLA code has, and it is
-    thinner than it looks: it carries no foreign transaction fee at all, and its
-    `maximum_late_fee` is the policy constant rather than the strategy's schedule
-    (FINDINGS #34). Asserting the launch's fee amounts here would fail on every Run, correct
-    template or not, so what is asserted is APR and the annual fees.
+    `predecisioned_terms` is the only application-time surface an MLA code has.
+    `maximum_late_fee` is the policy constant, not the schedule, on every code (FINDINGS #34) -
+    that key is unrelated to the launch and stays pinned to `35.0`. Since CSRV-5841 (merged),
+    the hash separately carries `late_fee_initial`, `late_fee_subsequent` and
+    `foreign_transaction_fee`, each nil for a strategy that configures none of them (backbook)
+    and strategy-derived for one that does (frontbook) - those are asserted against the matrix
+    like every other point.
     """
     app = obs.get("application") or {}
     terms = app.get("predecisioned_terms") or {}
@@ -156,6 +158,10 @@ def application_point(row, obs):
     y2_actual = (_money(terms.get("annual_membership_fee_year_two")),
                  _money(terms.get("monthly_membership_fee_year_two")))
 
+    frontbook = row["role"] == "new"
+    want = own_amounts(row) if frontbook else dict(
+        late_fee_initial=None, late_fee_subsequent=None, foreign_transaction_fee=None)
+
     return [
         _check("decision path strategy", row.get("mla_base_code") or row["code"],
                app.get("decision_path_strategy")),
@@ -165,6 +171,12 @@ def application_point(row, obs):
         _check("year two fee, annual or monthly", y2, y2_actual, ok=y2 in y2_actual),
         _check("maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
                35.0, _money(terms.get("maximum_late_fee"))),
+        _check("late_fee_initial", _money(want["late_fee_initial"]),
+               _money(terms.get("late_fee_initial"))),
+        _check("late_fee_subsequent", _money(want["late_fee_subsequent"]),
+               _money(terms.get("late_fee_subsequent"))),
+        _check("foreign_transaction_fee", _money(want["foreign_transaction_fee"]),
+               _money(terms.get("foreign_transaction_fee"))),
     ]
 
 
