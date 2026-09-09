@@ -1208,12 +1208,23 @@ docker compose -p "$BASIC_PROJECT" exec -T redis redis-cli \
 Get `<IP>` from the container logs (`docker compose -p "$BASIC_PROJECT" logs web | grep "applications per day"`)
 or `redis-cli KEYS "customer_fraud_ring:*"`.
 
-**Not yet fixed durably.** This will keep happening - a single 28-code Campaign is already close
-to the limit, run twice in a day and it is guaranteed. Two options, neither applied: a local-stack
-initializer that adds the Docker bridge range to `Util::WhiteList::INTERNAL_IPS` (matches the
-existing `zzz_local_*.rb` pattern, but that constant is a frozen array of `IPAddr`, built at load
-time - would need reopening the module, not just appending), or one that stubs
-`check_and_track_application_rate_limit!` to a no-op under `Rails.env.development?` (simpler,
-mirrors `zzz_local_render_provenance.rb`'s guard). Whichever lands should also decide whether
-`run_validation.py` should pre-flight-check the Redis key and clear it automatically, or just
-surface a clearer error than a generic `SubmitFailed`.
+**Fixed durably 2026-09-10.** `local-stack/zzz_local_rate_limit_bypass.rb` prepends
+`Customer#check_and_track_application_rate_limit!` to return immediately under
+`Rails.env.development?` - the simpler of the two options above, since
+`Util::WhiteList::INTERNAL_IPS` is a frozen array built at load time and would need reopening the
+module rather than just appending to it. Wired into `local-stack/restore.sh` and asserted by
+`bootstrap.sh`'s silent-failure checks (`boot log: LocalRateLimitBypass active`), so a stack
+missing it fails loudly instead of quietly re-tripping this. **Requires restarting the `web`
+service after `restore.sh` places a *new* initializer file** - it is volume-mounted so the file
+appears immediately, but the already-booted Rails process does not reload initializers on its
+own (`docker compose -p "$BASIC_PROJECT" restart web`, then re-verify).
+
+Verified: three direct `curl`s against an apply URL that previously 500'd all returned `302`
+(normal redirect) with the stale Redis counter still in place, and a full
+`run_validation.py 0122` run afterward passed cleanly end to end (`cma`, `predecisioned_terms`,
+`schumer_box_apply` all 100%) - the prepend does not appear to break anything else on `Customer`.
+
+Still open: `run_validation.py` gives no special-cased error for this class of failure (it would
+have shown as a generic halted `SubmitFailed` before the fix); that's fine now that the underlying
+limit is gone, but worth remembering if `MAXIMUM_ALLOWED_PER_DAY_FROM_SAME_IP` is ever exceeded
+some *other* way this bypass doesn't cover.

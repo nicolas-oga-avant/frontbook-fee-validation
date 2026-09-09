@@ -69,6 +69,7 @@ restore zzz_local_render_provenance.rb           avant-basic     config/initiali
 restore zzz_local_cma_render.rb                  avant-basic     config/initializers/zzz_local_cma_render.rb
 restore zzz_local_run_observations.rb            avant-basic     config/initializers/zzz_local_run_observations.rb
 restore zzz_local_caf_preview_bundle.rb          avant-basic     config/initializers/zzz_local_caf_preview_bundle.rb
+restore zzz_local_rate_limit_bypass.rb           avant-basic     config/initializers/zzz_local_rate_limit_bypass.rb
 restore credit-card-api.compose.override.yml     credit-card-api compose.override.yml
 restore crm.docker-compose.override.yml          crm             docker-compose.override.yml
 

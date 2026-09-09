@@ -288,7 +288,7 @@ bootlog="$(cd "$VALIDATION_ROOT/avant-basic" && docker compose -p "$BASIC_PROJEC
   sh -c 'grep -h "\[local\]" log/development.log 2>/dev/null' 2>/dev/null || true)"
 for want in 'LocalConsolidatedCma active' 'LocalRenderProvenance active' 'LocalMlaStub active' \
             'LocalRunObservations active' 'LocalCafPreviewBundle active' \
-            'FakeTransunion mock registered'; do
+            'LocalRateLimitBypass active' 'FakeTransunion mock registered'; do
   case "$bootlog" in
     *"$want"*) ok "boot log: $want" ;;
     *) die "no '[local] $want' in log/development.log.
