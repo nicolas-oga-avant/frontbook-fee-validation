@@ -38,6 +38,15 @@ services:
       # so the credential never lands in this file, which exists to be copied around.
       # It is a production credential - keep it in .env.local, never here.
       AVANT_TEMPLATES_API_KEY:
+      # Same pattern, same reason (FINDINGS #36/#40): without this, `config/initializers/
+      # 129_optimizely.rb` never sees OPTIMIZELY_SDK_KEY even when .env.local sets it -
+      # bootstrap.sh exports .env.local into its own shell (`set -a; . "$ENVFILE"`), but
+      # Compose does not forward an arbitrary shell var into the container unless it is
+      # declared here, valueless, same as the TemplateFlow key above. Without a live key
+      # the client falls back to a datafile snapshot committed to the repo, which predates
+      # this campaign's codes entirely - every RPF-eligibility read comes back false no
+      # matter what the live audience actually says.
+      OPTIMIZELY_SDK_KEY:
 
   sidekiq:
     <<: *basic-env
