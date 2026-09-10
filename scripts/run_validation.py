@@ -266,6 +266,35 @@ def record_result(code, surface, status, attempt=None, blocked_on=None):
                         blocked_on=blocked_on)
 
 
+def _provenance_envelope(templateflow_host=None, template_version=None, render_mode=None,
+                          mla_forced=None, capture=None, control=None):
+    """One fixed key set for every Attempt's provenance, whichever of the three surfaces wrote
+    it - a field that does not apply to a given surface is explicitly None (rendered "NOT
+    CAPTURED" by scripts/render_report.py), never simply absent. That is what lets the report
+    read every provenance dict the same way, with no per-surface branching."""
+    return {
+        "templateflow_host": templateflow_host,
+        "template_version": template_version,
+        "render_mode": render_mode,
+        "mla_forced": mla_forced,
+        "capture": capture,
+        "control": control,
+    }
+
+
+def _assertion_row(label, passed, expected="ALL PASS", actual=None):
+    """One fixed key set for every recorded assertion row, matching assert_value_table.py's own
+    --json shape - so run_schumer_box_apply's single summary row is not a different shape from
+    the value table's per-field rows."""
+    return {
+        "label": label,
+        "status": "PASS" if passed else "FAIL",
+        "expected": expected,
+        "actual": actual if actual is not None else ("ALL PASS" if passed else "see evidence"),
+        "passed": passed,
+    }
+
+
 def run_schumer_box_apply(code, apply_result, row, evidence_dir):
     """Assert the Schumer box apply_driver.py already captured mid-walk. Returns
     (status, detail) - status is "passed" or "failed" (never "not_applicable" here; that is
@@ -323,6 +352,23 @@ def main():
                           "- no application, no browser")
     args = ap.parse_args()
 
+    try:
+        return _run(args)
+    finally:
+        # Best-effort, always - regenerating the report must never affect this script's real
+        # exit code, and must happen on every exit path (including a halt) rather than only the
+        # happy path, or the report itself would go silently stale exactly like the failure
+        # modes this repo's own rules exist to catch.
+        if not args.skip_manifest:
+            try:
+                import render_report
+                render_report.generate()
+            except Exception as e:
+                print("WARNING: report regeneration failed: %s: %s"
+                      % (type(e).__name__, e), file=sys.stderr)
+
+
+def _run(args):
     slug = _slug(args.branch)
     validation_root = args.validation_root or os.path.expanduser(
         "~/Source/avant/frontbook-validation%s" % slug)
@@ -429,8 +475,8 @@ def main():
             for surface in surfaces:
                 record_result(args.code, surface, "halted", {
                     "stage": stage,
-                    "provenance": {},
-                    "failure": {"class": "mechanical", "message": message},
+                    "provenance": _provenance_envelope(),
+                    "failure": {"class": "mechanical", "step": stage, "summary": message},
                 })
         raise
 
@@ -466,33 +512,45 @@ def main():
             " (no --control found for this backbook code - unproven, see output file)"
             if row["role"] != "new" and not schumer_detail.get("control") else "")))
 
-    provenance = {
-        "templateflow_host": console_result["provenance"]["templateflow_host"],
-        "template_version": console_result["provenance"]["template_version_id"],
-        "render_mode": console_result["provenance"]["render_mode"],
+    provenance = _provenance_envelope(
+        templateflow_host=console_result["provenance"]["templateflow_host"],
+        template_version=console_result["provenance"]["template_version_id"],
+        render_mode=console_result["provenance"]["render_mode"],
+        mla_forced=is_mla,
+    )
+    # Captured by explicit id, never re-derived from "the newest file in the directory"
+    # (AGENTS.md hard rule 1) - evidence/run-<code>/ can and does hold more than one render
+    # across a code's Attempt history, and cma_log_id is the only thing that says which one THIS
+    # Attempt actually produced. scripts/render_report.py locates the render by this handle.
+    handles = {
+        "application_id": console_result["application_id"],
+        "cca_id": console_result["credit_card_account_id"],
+        "cma_log_id": console_result["agreement_log_id"],
     }
     evidence_dir_rel = "evidence/run-%s/" % args.code
 
     if not args.skip_manifest:
         record_result(args.code, "cma", status, {
-            "stage": "asserted", "provenance": provenance, "evidence_dir": evidence_dir_rel,
-            "assertions": assertions, "rpf": report["rpf"],
+            "stage": "asserted", "provenance": provenance, "handles": handles,
+            "evidence_dir": evidence_dir_rel, "assertions": assertions, "rpf": report["rpf"],
         })
         record_result(args.code, "predecisioned_terms", pt_status, {
-            "stage": "asserted", "provenance": provenance, "evidence_dir": evidence_dir_rel,
-            "assertions": pt_assertions,
+            "stage": "asserted", "provenance": provenance, "handles": handles,
+            "evidence_dir": evidence_dir_rel, "assertions": pt_assertions,
         })
         if not is_mla:
             record_result(args.code, "schumer_box_apply", schumer_status, {
                 "stage": "asserted",
-                "provenance": {"capture": schumer_detail.get("capture"),
-                               "control": schumer_detail.get("control")},
+                "provenance": _provenance_envelope(
+                    mla_forced=is_mla,
+                    capture=schumer_detail.get("capture"),
+                    control=schumer_detail.get("control"),
+                ),
+                "handles": handles,
                 "evidence_dir": evidence_dir_rel,
-                "assertions": [{
-                    "label": "schumer_box_apply value table (assert_schumer_box.py)",
-                    "passed": schumer_status == "passed",
-                    "output_file": schumer_detail.get("output_file"),
-                }],
+                "assertions": [_assertion_row(
+                    "schumer_box_apply value table (assert_schumer_box.py)",
+                    schumer_status == "passed")],
             })
     else:
         print("(--skip-manifest: not recorded)")

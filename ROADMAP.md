@@ -543,10 +543,17 @@ to support.
       closing the exact gap where a plausible-but-wrong status could be recorded by hand (AGENTS.md
       hard rule 5). Verified: a status contradicting its own assertions is rejected, not silently
       accepted
-- [ ] Every handle captured by explicit id. **Audit for `.last` and remove every one**
+- [x] Every handle captured by explicit id, for `cma`/`predecisioned_terms`/`schumer_box_apply`:
+      `run_validation.py` now stamps `handles.application_id`/`cca_id`/`cma_log_id` straight off
+      `console_runner.rb`'s own return values, never re-derived from "the newest file in
+      evidence/run-<code>/" - which that directory can and does hold more than one of across a
+      code's Attempt history. `scripts/render_report.py` locates each Attempt's own render this
+      way. Audit for `.last` elsewhere in the codebase not done as part of this pass
 - [ ] `LocalCmaStub.revert!` in a finally-block, so a crashed Run leaves no pinned account
 - [ ] Database identity recorded on each Attempt
-- [ ] `template_version_uuid`, TemplateFlow host and repo SHAs stamped on every Attempt
+- [x] `template_version_uuid` and TemplateFlow host stamped on every Attempt (already were); repo
+      SHAs still not - never populated anywhere, rendered honestly as "NOT CAPTURED" rather than
+      silently omitted (`scripts/render_report.py`)
 - [ ] `VALIDATION_BRANCH` and the per-repo resolved branches stamped too, from
       `.branch-provenance`. A Campaign refuses to mix trunks; switching trunk starts a new one
 - [ ] Epoch derived from `template_version_uuid`, never from a fee amount
@@ -570,14 +577,30 @@ to support.
 
 ### 2.5 The artifact
 
-- [ ] `artifact-design` skill loaded before writing it
-- [ ] Pair-first layout, headline verdict, evidence behind toggles
-- [ ] Shows template version, host, repo SHAs, `mla_forced` and Interventions per Run
-- [ ] Draft renders visibly distinguished from approved ones
-- [ ] One row per **surface** per Run, so a Run passing on the CMA and unrun on the Schumer box
-      cannot read as green. A blocked surface shows the ticket blocking it
-- [ ] Screenshots embedded per surface, since the ticket's sign-off is the screenshots
-- [ ] Regenerated after every Run, not only at the end
+Built as a local static site (`scripts/render_report.py`), not a published Claude Artifact -
+confirmed with the user: local-only for now, no share/publish mechanism needed yet. Zero LLM
+involvement to generate or view it, matching Phase 2's own "remove the LLM from the loop" goal.
+
+- [x] N/A - `artifact-design` is for Claude Code's Artifact-publish tool, not applicable to a
+      plain repo-local `report/index.html`
+- [x] Pair-first layout, headline verdict (PASS/NEEDS ATTENTION/INCOMPLETE, strict - every one of
+      10 Surface cells must be `passed`), evidence behind `<details>` toggles
+- [x] Shows template version, host, `mla_forced` and Interventions per Run. `repo_shas` renders
+      honestly as "NOT CAPTURED" - never populated anywhere yet (confirmed by grep, not assumed)
+- [x] Draft vs. approved render distinguished via a trust badge sourced from the raw per-render
+      `provenance.json` (`preview`/`allow_unapproved`/`draft_render`), not the thinner Manifest
+      copy - AGENTS.md hard rule 3
+- [x] One row per **surface** per Run (status chips in `manifest.py`'s own `SURFACES` order); the
+      strict Pair verdict means a Run passing on `cma` alone cannot read as PASS at the Pair level
+- [x] Screenshots embedded per surface (`schumer_box_apply`'s capture); `cma` embeds the actual
+      rendered agreement in an iframe instead of a screenshot - product's sign-off is reading it
+- [x] Regenerated after every `run_validation.py` exit (`try/finally` around `_run()`, so a
+      halted Run's report is current too, not just a passing one), best-effort - never affects
+      that script's own exit code
+- Live-verified 2026-09-10 against the real Manifest (28 codes: 2 run, 26 `pending`) plus a
+  synthetic `halted` Attempt against a scratch copy - every state (`passed`, `failed` with a
+  highlighted row, `pending`, `not_applicable`/MLA, `halted` with a failure table) renders without
+  exceptions, opened via a bare `file://` URL
 
 ### 2.6 The Campaign
 
