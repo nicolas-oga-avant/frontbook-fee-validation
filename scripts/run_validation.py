@@ -17,14 +17,18 @@ exactly as reported, never retried or reinterpreted. A raised exception anywhere
 console phase is a Mechanical Failure by definition - it is recorded `halted`, not silently
 swallowed, and always re-raised to the caller (assume silence means failure).
 
-Also auto-records `schumer_box_basic` and `schumer_box_landing` every Run - not from a hardcoded
-assumption, but from a live HTTP probe of each surface's own URL (apply_harness.py's
-surface_urls()), because both surfaces' "blocked" status is conditional, not a platform constant:
-`schumer_box_basic` blocks only because this repo runs off `main` (FINDINGS #35 - the route is
-`mp`-only, and already has a proven checker there), and `schumer_box_landing` blocks on two tickets
-this repo does not control the shipping of (CSRV-5845/5846). A hardcoded "blocked" would silently
-go stale the day either changes - the same silent-failure trap AGENTS.md's central rule warns
-about, just aimed at this script's own assumptions instead of the platform's.
+Also auto-records `schumer_box_basic` every Run from a live HTTP probe of its own URL
+(apply_harness.py's surface_urls()) rather than a hardcoded assumption: it blocks only because
+this repo runs off `main` (FINDINGS #35 - the route is `mp`-only, and already has a proven
+checker there) - a fact that could change out from under a hardcoded "blocked".
+
+`schumer_box_landing` is asserted for real, the same way as `schumer_box_apply`: probed live
+first (still `blocked` on CSRV-5845/5846 for a code with no Contentful draft yet), and once the
+route resolves, captured via a standalone Chrome (scripts/run_schumer_landing_standalone.py,
+same ROADMAP-2.1-style CDP reuse as the apply walk) and asserted with the same
+assert_schumer_box.py checker and the same frontbook-before-backbook --control rule. Verified
+2026-09-10 against dev.avant.com once CSRV-5846's Contentful drafts existed - see
+surfaces/schumer_box_landing.md and avant/.tickets/CSRV-5846/CSRV-5846-NOTES.md.
 
 Scope: `cma`, `predecisioned_terms` and `schumer_box_apply`, from one applied application.
 `predecisioned_terms` IS assert_value_table.py's point "2. Decisioned application" - already
@@ -38,9 +42,9 @@ already run through this script too, so its capture sits on disk to use as `--co
 backbook code run standalone still asserts, honestly, without one and can legitimately come back
 `failed` ("unproven") rather than silently skipped.
 
-The two Schumer surfaces this script does NOT touch are `schumer_box_basic` (unreachable on
-`main`, FINDINGS #35) and `schumer_box_landing` (blocked on unshipped tickets) - see
-.claude/skills/test-frontbook-fee-launch/SKILL.md for what those still need a human/LLM for.
+The one Schumer surface this script still does NOT assert for real is `schumer_box_basic`
+(unreachable on `main`, FINDINGS #35 - needs a Run against `mp` to go further than the probe) -
+see .claude/skills/test-frontbook-fee-launch/SKILL.md.
 
 Known, pre-existing incompleteness for a BACKBOOK code's `cma` verdict specifically: Layer 1's
 foreign-transaction-absence point is deliberately proven by a separate script
@@ -76,6 +80,7 @@ import apply_harness                     # noqa: E402
 import manifest as manifest_mod          # noqa: E402
 import redline_text                      # noqa: E402
 import run_apply_standalone              # noqa: E402
+import run_schumer_landing_standalone    # noqa: E402
 
 CONFETTI_BASE = os.environ.get("CONFETTI_BASE", "https://confetti.boston.k8s.prd.app.avant.com")
 
@@ -135,9 +140,17 @@ def _probe_reachable(url, timeout=5):
     """True if `url` renders something, False if it 404s - the only two answers that mean
     anything here. Anything else (connection refused, timeout, a 500) raises RunFailed: the
     stack being unreachable is not evidence that a surface is unbuilt, and must not be read as
-    one."""
+    one.
+
+    Sends a browser-like User-Agent, not urllib's default (`Python-urllib/x.y`): confirmed
+    2026-09-10 that dev.avant.com's WAF answers the bare default with a 403 (not a 404), on a
+    URL that curl and a real Chrome both reach as 200 - a false "check manually" on every
+    schumer_box_landing probe otherwise, on every code, not a sign anything is actually blocked.
+    """
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (compatible; frontbook-fee-validation probe)"})
     try:
-        with urllib.request.urlopen(url, timeout=timeout):
+        with urllib.request.urlopen(req, timeout=timeout):
             return True
     except urllib.error.HTTPError as e:
         if e.code == 404:
@@ -152,20 +165,22 @@ def _probe_reachable(url, timeout=5):
 _STATIC_SCHUMER_SURFACES = (
     # (manifest surface name, apply_harness.surface_urls() key, blocked_on if 404)
     ("schumer_box_basic", "schumer_basic", ["dev-mp-only, see FINDINGS #35"]),
-    ("schumer_box_landing", "schumer_landing", ["CSRV-5845", "CSRV-5846"]),
 )
 
 
 def record_static_schumer_surfaces(code, row):
-    """schumer_box_basic and schumer_box_landing need no application - just the code's uuid
-    (surfaces/schumer_box_basic.md, surfaces/schumer_box_landing.md) - so they are recorded here
-    independent of whether apply/console/assert below succeeds. Each is probed live rather than
-    assumed: an MLA code is not_applicable (no uuid, FINDINGS #8, decided the same way as
-    schumer_box_apply); otherwise a 404 means still blocked (their own doc's tickets), and
-    anything else means the route now resolves - which is not a pass, since neither surface has
-    a capture/assert step wired into this script yet. That gets `not_implemented`, not a silent
-    `blocked`, so the day either ships this stops being wrong on its own rather than needing a
-    person to remember to flip it.
+    """schumer_box_basic needs no application - just the code's uuid (surfaces/
+    schumer_box_basic.md) - so it is recorded here independent of whether apply/console/assert
+    below succeeds. Probed live rather than assumed: an MLA code is not_applicable (no uuid,
+    FINDINGS #8, decided the same way as schumer_box_apply); otherwise a 404 means still blocked
+    (dev-mp-only, FINDINGS #35), and anything else means the route now resolves - which is not a
+    pass, since this surface has no capture/assert step wired into this script yet (it needs a
+    Run against `mp`, not just a probe against whatever branch this Run is on). That gets
+    `not_implemented`, not a silent `blocked`, so the day `mp` runs are wired in this stops being
+    wrong on its own rather than needing a person to remember to flip it.
+
+    schumer_box_landing is NOT here any more - it is asserted for real by
+    run_schumer_box_landing() below, the same way schumer_box_apply is.
     """
     if not row.get("uuid"):
         return {name: ("not_applicable", None) for name, _, _ in _STATIC_SCHUMER_SURFACES}
@@ -326,6 +341,109 @@ def run_schumer_box_apply(code, apply_result, row, evidence_dir):
     }
 
 
+def run_schumer_box_landing(code, row, evidence_dir, headless=None, landing_base=None):
+    """schumer_box_landing needs no application at all - addressed purely by the code's strategy
+    uuid, exactly like schumer_box_basic - so it runs independent of the apply/console/cma flow,
+    before that flow even starts (a halt in there must not blank out this Surface's own result).
+
+    Probed live first, same as record_static_schumer_surfaces does for schumer_box_basic: a 404
+    is still `blocked` on CSRV-5845/5846, not a failure - most codes have no Contentful draft
+    imported yet. Once the route resolves (dev.avant.com rebuilds with a draft - CSRV-5846-
+    NOTES.md), captured via a standalone Chrome (run_schumer_landing_standalone.py) and asserted
+    with the same checker and the same frontbook-before-backbook --control rule as
+    schumer_box_apply: assert_schumer_box.py's own docstring already treats avant-basic's
+    schumer_box, the account-opening box and the Contentful landing page as one disclosure.
+
+    Returns (status, detail). status is "blocked", "passed" or "failed" - never
+    "not_applicable" here; that is decided by the caller from the code's row alone, before any
+    of this runs, exactly like schumer_box_apply.
+    """
+    # apply_harness.LANDING_BASE is bound once, at whichever moment this module was first
+    # imported - long before any caller here has a chance to say where the Contentful drafts
+    # actually are. Reassigning the module attribute (not just the environment variable) is
+    # what makes surface_urls() below build the probe URL against the right host instead of
+    # apply_harness's own default (APPLY_BASE, the local stack - never where this surface lives).
+    resolved_base = (landing_base or os.environ.get("LANDING_BASE")
+                     or run_schumer_landing_standalone.DEFAULT_LANDING_BASE)
+    apply_harness.LANDING_BASE = resolved_base
+    os.environ["LANDING_BASE"] = resolved_base
+
+    url, _ = apply_harness.surface_urls(code)["schumer_landing"]
+    try:
+        reachable = _probe_reachable(url)
+    except RunFailed as e:
+        return "failed", {"reason": "probe: %s" % e.message}
+    if not reachable:
+        return "blocked", {"blocked_on": ["CSRV-5845", "CSRV-5846"]}
+
+    try:
+        capture = run_schumer_landing_standalone.run(
+            code, headless=headless, out_root=None, landing_base=landing_base)
+    except Exception as e:
+        return "failed", {"reason": "capture failed: %s: %s" % (type(e).__name__, e)}
+
+    cmd = [sys.executable, os.path.join(_HERE, "assert_schumer_box.py"), capture["html"],
+           "--code", code]
+    control_path = None
+    if row["role"] != "new":
+        sibling = row["replaces_or_replaced_by"]
+        candidate = os.path.join(_ROOT, "evidence", "run-%s" % sibling,
+                                 "schumer_landing_%s.html" % sibling)
+        if os.path.exists(candidate):
+            control_path = candidate
+            cmd += ["--control", control_path]
+
+    os.makedirs(evidence_dir, exist_ok=True)
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    out_path = os.path.join(evidence_dir, "schumer_box_landing_%s.txt" % code)
+    with open(out_path, "w") as fh:
+        fh.write(r.stdout + r.stderr)
+
+    return "passed" if r.returncode == 0 else "failed", {
+        "capture": capture["html"], "control": control_path,
+        "output_file": out_path, "exit_code": r.returncode,
+    }
+
+
+def _handle_schumer_box_landing(args, row, is_mla, evidence_dir):
+    """Runs and records schumer_box_landing, or records not_applicable for an MLA code. Shared
+    by the normal flow and --check-schumer-landing so there is exactly one call site for this
+    Surface's real logic. Returns the status ("not_applicable", "blocked", "passed", "failed",
+    or None if --skip-manifest suppressed even attempting it)."""
+    if is_mla:
+        print("code %s is MLA-forced: schumer_box_landing is not_applicable (no strategy uuid, "
+              "FINDINGS #8)" % args.code)
+        if not args.skip_manifest:
+            record_result(args.code, "schumer_box_landing", "not_applicable")
+        return "not_applicable"
+
+    if args.skip_manifest:
+        return None
+
+    print("[static] schumer_box_landing (dev.avant.com, Contentful drafts - "
+          "CSRV-5845/5846)...")
+    landing_status, landing_detail = run_schumer_box_landing(
+        args.code, row, evidence_dir, headless=args.headless, landing_base=args.landing_base)
+    print("    schumer_box_landing -> %s" % landing_status)
+    if landing_status == "blocked":
+        record_result(args.code, "schumer_box_landing", "blocked",
+                      blocked_on=landing_detail["blocked_on"])
+    else:
+        record_result(args.code, "schumer_box_landing", landing_status, {
+            "stage": "asserted",
+            "provenance": _provenance_envelope(
+                mla_forced=is_mla,
+                capture=landing_detail.get("capture"),
+                control=landing_detail.get("control"),
+            ),
+            "evidence_dir": "evidence/run-%s/" % args.code,
+            "assertions": [_assertion_row(
+                "schumer_box_landing value table (assert_schumer_box.py)",
+                landing_status == "passed")],
+        })
+    return landing_status
+
+
 def _status_for(rows):
     return "passed" if all(r["passed"] for r in rows) else "failed"
 
@@ -348,8 +466,18 @@ def main():
     ap.add_argument("--check-confetti", action="store_true",
                      help="only run the Confetti pre-flight and exit - no stack, no browser")
     ap.add_argument("--check-schumer-static", action="store_true",
-                     help="only probe/record schumer_box_basic and schumer_box_landing and exit "
-                          "- no application, no browser")
+                     help="only probe/record schumer_box_basic (dev-mp-only) and exit - no "
+                          "application, no browser. schumer_box_landing is no longer static; it "
+                          "runs for real as part of the normal flow below")
+    ap.add_argument("--check-schumer-landing", action="store_true",
+                     help="only run/record schumer_box_landing and exit - a real browser "
+                          "against --landing-base, but no application/console/render. Backfills "
+                          "this Surface for a code already fully run on cma/predecisioned_terms/"
+                          "schumer_box_apply without re-walking the whole chain")
+    ap.add_argument("--landing-base", default=os.environ.get("LANDING_BASE"),
+                     help="host that renders Contentful drafts for schumer_box_landing, e.g. "
+                          "https://dev.avant.com (default: run_schumer_landing_standalone.py's "
+                          "own default)")
     args = ap.parse_args()
 
     try:
@@ -402,6 +530,10 @@ def _run(args):
                 record_result(args.code, surface, status, blocked_on=blocked_on)
         return 0
 
+    if args.check_schumer_landing:
+        status = _handle_schumer_box_landing(args, row, not row.get("uuid"), evidence_dir)
+        return 0 if status in (None, "not_applicable", "blocked", "passed") else 1
+
     is_mla = not row.get("uuid")
     if is_mla:
         print("code %s is MLA-forced: schumer_box_apply is not_applicable (no strategy uuid, "
@@ -410,11 +542,12 @@ def _run(args):
             record_result(args.code, "schumer_box_apply", "not_applicable")
 
     if not args.skip_manifest:
-        print("[static] schumer_box_basic / schumer_box_landing (live probe, no application "
-              "needed)...")
+        print("[static] schumer_box_basic (live probe, dev-mp-only, no application needed)...")
         for surface, (status, blocked_on) in record_static_schumer_surfaces(
                 args.code, row).items():
             record_result(args.code, surface, status, blocked_on=blocked_on)
+
+    landing_status = _handle_schumer_box_landing(args, row, is_mla, evidence_dir)
 
     stage = "confetti"
     try:
@@ -556,7 +689,8 @@ def _run(args):
         print("(--skip-manifest: not recorded)")
 
     all_passed = status == "passed" and pt_status == "passed" and (
-        is_mla or schumer_status == "passed")
+        is_mla or schumer_status == "passed") and (
+        landing_status in (None, "passed", "blocked", "not_applicable"))
     return 0 if all_passed else 1
 
 

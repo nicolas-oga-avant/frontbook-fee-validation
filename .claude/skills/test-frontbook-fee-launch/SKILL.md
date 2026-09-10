@@ -15,10 +15,12 @@ runs apply (via `scripts/run_apply_standalone.py` - its own throwaway Chrome, ze
 tool calls, ROADMAP 2.1; this same walk also captures the account-opening Schumer box for free),
 console (approve/issue/render, `scripts/console_runner.rb`, unchanged), the value-table and Schumer
 box assertions, and all three Surfaces' `manifest.py record` calls, in one call - see
-`surfaces/cma.md`'s top note. The same call also live-probes `schumer_box_basic` and
-`schumer_box_landing` and records those two too (`blocked`, `not_applicable`, or `not_implemented`
-if the route now resolves) - neither has a capture/assert step wired in yet, but nothing about
-their status needs recording by hand anymore either. What is still yours: picking the code,
+`surfaces/cma.md`'s top note. The same call also asserts `schumer_box_landing` for real
+(`scripts/run_schumer_landing_standalone.py`, a second standalone Chrome pointed at
+`dev.avant.com`'s Contentful drafts - `surfaces/schumer_box_landing.md`) and live-probes
+`schumer_box_basic` (`blocked`, `not_applicable`, or `not_implemented` if the route now resolves -
+it has no capture/assert step wired in yet, unlike `schumer_box_landing` now). What is still yours:
+picking the code,
 reading the result, and driving a stage by hand (`surfaces/cma.md` Steps 3-4, or the browser-harness
 form of the apply walk) when `run_validation.py` halts - it prints which stage failed and re-raises
 rather than guessing. `ROADMAP.md` 2.3 tracks what is still open (failure classification beyond
@@ -126,7 +128,7 @@ or explicitly reported as not-yet-checked.
 | `predecisioned_terms` | avant-basic, post-decision, before issuance | all 28 codes - the only surface an MLA code has besides the CMA | **Implemented** - discloses neither launch fee (FINDINGS #34) | `surfaces/predecisioned_terms.md` |
 | `schumer_box_basic` | `/schumer_box/<uuid>` on dev-mp | the 8 base codes + 8 predecessors (no UUID for MLA codes) | Checker implemented, **unreachable on `main`** (FINDINGS #35) | `surfaces/schumer_box_basic.md` |
 | `schumer_box_apply` | `/apply?product_type=credit_card&strategy=<uuid>` | same 16 | **Implemented**, expected to fail until CSRV-5843 + CSRV-5844 ship | `surfaces/schumer_box_apply.md` |
-| `schumer_box_landing` | `/credit-card/landing/schumer/<uuid>` | same 16 | **Blocked** on CSRV-5845 + CSRV-5846 | `surfaces/schumer_box_landing.md` |
+| `schumer_box_landing` | `/credit-card/landing/schumer/<uuid>` | same 16 | **Implemented**, unblocked 2026-09-10 (CSRV-5846 drafts) | `surfaces/schumer_box_landing.md` |
 
 Each file in the `surfaces/` column is self-contained for that Surface: its own steps (or its own
 explicit refusal, if not yet implemented or blocked). Load only the file(s) for the Surface(s) you
@@ -159,8 +161,10 @@ python3 scripts/manifest.py record 0122 schumer_box_apply failed --attempt-json 
 ```
 
 `schumer_box_basic` and `schumer_box_landing` do not need this by hand - `run_validation.py`
-records both automatically, every Run, from a live probe of each surface's own URL (see the note
-above and `surfaces/schumer_box_basic.md` / `surfaces/schumer_box_landing.md`).
+records both automatically, every Run: `schumer_box_basic` from a live probe of its own URL
+(still no capture/assert step - `surfaces/schumer_box_basic.md`), `schumer_box_landing` from a
+real capture and assertion against `dev.avant.com`'s Contentful drafts
+(`surfaces/schumer_box_landing.md`).
 
 `record` touches only the one `(code, surface)` cell named - every other Surface's status and
 Attempt history is left exactly as it was. That is the whole mechanism: nothing about running
@@ -174,9 +178,9 @@ append-only Attempt rule (AGENTS.md rule 1) can be silently violated by a slippe
   `python3 scripts/manifest.py report 0122` first. If `cma`, `predecisioned_terms` or
   `schumer_box_apply` is not already `passed` under the current Template Version, run
   `python3 scripts/run_validation.py 0122` once - it produces and records all three from one
-  applied application (see below), and records `schumer_box_basic`/`schumer_box_landing` too (a
-  live probe, not an assumption - see the note above). Never silently narrow a full validation
-  down to just the CMA.
+  applied application (see below), and asserts `schumer_box_basic`/`schumer_box_landing` too (a
+  live probe for the former, a real capture+assert for the latter - see the note above). Never
+  silently narrow a full validation down to just the CMA.
 - **Scoped** ("just check the cma surface for 0122", "run predecisioned_terms for 3M33", or
   `--surface cma,predecisioned_terms`): if the named Surface is `cma`, `predecisioned_terms` or
   `schumer_box_apply`, `run_validation.py` is what to run either way - the three are produced by
@@ -199,8 +203,10 @@ append-only Attempt rule (AGENTS.md rule 1) can be silently violated by a slippe
   Only fall back to `surfaces/cma.md` Steps 3-4's manual per-stage walk when `run_validation.py`
   halts and something needs to be re-diagnosed by hand. `schumer_box_basic` and
   `schumer_box_landing` need no application at all - if one of those is the *only* Surface asked
-  for, `python3 scripts/run_validation.py <CODE> --check-schumer-static` records just those two
-  from a live probe, without the apply+console walk the other three need.
+  for, `python3 scripts/run_validation.py <CODE> --check-schumer-static` records just
+  `schumer_box_basic` (a live probe), and `--check-schumer-landing` runs and records just
+  `schumer_box_landing` for real (a standalone browser against `dev.avant.com`, no apply+console
+  walk).
 
 ## Running the whole Campaign
 

@@ -396,14 +396,22 @@ hardcodes `Up to $39` and `Foreign Transaction: None` for every strategy. A fron
         `evidence/run-0122/schumer_account_opening_0122.{html,png}`
   - [ ] Five of the ticket's six not yet walked against the override: `0123`, `3303`, `0120`,
         `0121`, `3302`. `9004` (the strategy-sensitivity control) belongs to CSRV-5303, not this six
-- [ ] **Contentful landing page** `/credit-card/landing/schumer/<uuid>` agrees with `/apply` for the
-      three frontbook codes, per runbook step 15.b. **Blocked on CSRV-5845 + CSRV-5846** - and
-      5845's own first acceptance criterion is that 5846 lands first, because all eight pages
-      currently 404, which is what this repo's probe already measured
-  - [x] CSRV-5845's own preview deploy probed against prod for `0120` and captured under
-        `evidence/pr-preview/`. Both are the Gatsby shell with no disclosure in the body, so the
-        PR's build changes nothing this campaign can assert yet - the page has to exist first,
-        which is CSRV-5846. Kept as the before half of the before-and-after
+- [x] **Contentful landing page** `/credit-card/landing/schumer/<uuid>`, asserted for real -
+      unblocked 2026-09-10: CSRV-5846 imported all 24 entries as Contentful drafts, which
+      `dev.avant.com` (Preview API) renders even unpublished (`avant/.tickets/CSRV-5846/
+      CSRV-5846-NOTES.md`). `scripts/run_schumer_landing_standalone.py` captures it (a standalone
+      Chrome, same CDP-reuse pattern as the apply walk - no browser-harness tool call), and
+      `run_schumer_box_landing()` in `run_validation.py` asserts it with the same checker and the
+      same frontbook-before-backbook `--control` rule as `schumer_box_apply`. Verified passing,
+      both directions of each pair, `0122`/`0120`, `3303`/`3302`, `3220`/`3219` - all four
+      discriminating absence checks fire 4-of-4 on every backbook capture, not `NO TEETH`
+  - [x] `_probe_reachable()` needed a browser-like `User-Agent` - `dev.avant.com`'s WAF answers
+        urllib's default UA with a 403 (not a 404), on a URL both curl and a real Chrome reach as
+        200. Fixed once, in the shared probe, not just for this surface
+  - [x] CSRV-5845's own preview deploy probed against prod for `0120` before CSRV-5846 imported
+        any drafts, captured under `evidence/pr-preview/` as the Gatsby shell with no disclosure
+        in the body - kept as the before half of the before-and-after, superseded by the real
+        passing captures above
 - [x] `surface_urls(code)` in the harness builds all three URLs per code and names what blocks each,
       off `SCHUMER_BASE` / `LANDING_BASE` so a Run can be pointed at basic-mp without an edit. An
       MLA code gets three `None`s and the reason, not a URL built with `strategy=None`
@@ -456,9 +464,10 @@ harness no longer assumes it.
       + console phases are scripted (`scripts/apply_driver.py`, `scripts/console_runner.rb`); not
       yet tried by an actual human
 - [ ] For one Pair, **all five surfaces** captured and asserted, not just the agreement.
-      `0122`/`0120`: 3/5 passed (`cma`, `predecisioned_terms`, `schumer_box_apply`); `schumer_box_basic`
-      blocked (no route on `main`, FINDINGS #35) and `schumer_box_landing` blocked (CSRV-5845/5846
-      not shipped) - both platform gaps, not harness gaps
+      `0122`/`0120`: 4/5 passed (`cma`, `predecisioned_terms`, `schumer_box_apply`,
+      `schumer_box_landing` - the last unblocked 2026-09-10, CSRV-5846's Contentful drafts);
+      `schumer_box_basic` still blocked (no route on `main`, FINDINGS #35) - a platform gap
+      (needs a Run against `mp`), not a harness gap
 
 ---
 

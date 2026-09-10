@@ -41,11 +41,25 @@ tests the fix pre-deploy via CAF PR #168's preview bundle; `bootstrap.sh` assert
 STATUS: NEEDS RE-CHECK if `bootstrap.sh` reports the preview bundle check failing, and once
 CSRV-5844 ships (retire the override then - see `surfaces/schumer_box_apply.md`).
 
-## 4. schumer_box_landing blocked on CSRV-5845 + CSRV-5846 - OPEN, same shape as item 3
+## 4. schumer_box_landing blocked on CSRV-5845 + CSRV-5846 - RESOLVED 2026-09-10
 
-CSRV-5845 (avant-redesign disclosure) is merged, not deployed; CSRV-5846 (8 Contentful pages) is
-Jira status Blocked, not started. Possibly testable pre-deploy via Contentful preview + avant-redesign
-preview deploy. Not yet verified.
+Unblocked: CSRV-5846 imported all 24 landing-page entries as Contentful drafts, and
+`dev.avant.com` (Preview API) renders unpublished drafts (`avant/.tickets/CSRV-5846/
+CSRV-5846-NOTES.md`, verified there in a real browser against `.schumer-container` for all 8 new
+codes and all 8 predecessors). This repo now asserts it for real too, independently:
+`scripts/run_schumer_landing_standalone.py` + `run_schumer_box_landing()` in
+`run_validation.py`, same checker (`assert_schumer_box.py`) and same frontbook-before-backbook
+`--control` rule as `schumer_box_apply`. Passing on `0122`/`0120`, `3303`/`3302`, `3220`/`3219` as
+of this check.
+
+Two things this repo's own probe needed that were not obvious from CSRV-5846's session:
+`LANDING_BASE` must be set to `https://dev.avant.com` (defaults to the local stack otherwise, an
+unrelated host that will always 404), and `dev.avant.com`'s WAF 403s a plain `urllib` request
+(default User-Agent) on a URL curl and a real Chrome both reach as 200 - `_probe_reachable()` now
+sends a browser-like UA.
+
+Still open, not this item: CSRV-5845/5846 are not yet published to `www.avant.com` (drafts only) -
+re-verify post-publish per CSRV-5846-NOTES.md's own Phase 3.
 
 ## 5. predecisioned_terms - RESOLVED, built; schumer_box_basic - OPEN, same shape as item 4
 

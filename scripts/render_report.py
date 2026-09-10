@@ -163,14 +163,20 @@ def locate_cma_evidence(code, attempt):
     }
 
 
-def locate_schumer_evidence(code):
-    """Schumer's account-opening capture is not versioned by log id - one live file per code's
-    evidence/ directory (apply_harness.py's capture_surface overwrites in place on a re-run), so
-    only ever meaningful for the LATEST Attempt, never the collapsed history."""
+def locate_schumer_evidence(code, capture_prefix, txt_prefix):
+    """Neither Schumer capture is versioned by log id - one live file per code's evidence/
+    directory (apply_harness.py's capture_surface overwrites in place on a re-run), so only ever
+    meaningful for the LATEST Attempt, never the collapsed history.
+
+    capture_prefix is apply_harness.py's own surface key for the html/png pair
+    (`schumer_account_opening` for schumer_box_apply, `schumer_landing` for schumer_box_landing
+    - the surface's manifest name and its capture filename differ for the apply one, for
+    historical reasons). txt_prefix is the assertion output file's own name, which is the
+    manifest surface name for both."""
     run_dir = os.path.join(EVIDENCE_ROOT, "run-%s" % code)
-    html_path = os.path.join(run_dir, "schumer_account_opening_%s.html" % code)
-    png_path = os.path.join(run_dir, "schumer_account_opening_%s.png" % code)
-    txt_path = os.path.join(run_dir, "schumer_box_apply_%s.txt" % code)
+    html_path = os.path.join(run_dir, "%s_%s.html" % (capture_prefix, code))
+    png_path = os.path.join(run_dir, "%s_%s.png" % (capture_prefix, code))
+    txt_path = os.path.join(run_dir, "%s_%s.txt" % (txt_prefix, code))
     return {
         "html": html_path if os.path.exists(html_path) else None,
         "png": png_path if os.path.exists(png_path) else None,
@@ -232,13 +238,15 @@ def render_evidence_embed(surface_name, code, attempt, report_code_dir):
         else:
             parts.append("<p>%s</p>" % esc(located["reason"] or MISSING))
 
-    elif surface_name == "schumer_box_apply":
-        located = locate_schumer_evidence(code)
+    elif surface_name in ("schumer_box_apply", "schumer_box_landing"):
+        capture_prefix = ("schumer_account_opening" if surface_name == "schumer_box_apply"
+                          else "schumer_landing")
+        located = locate_schumer_evidence(code, capture_prefix, surface_name)
         if located["png"]:
-            png_name = copy_evidence_file(located["png"], ev_dir, "schumer_account_opening.png")
+            png_name = copy_evidence_file(located["png"], ev_dir, "%s.png" % capture_prefix)
             parts.append('<img class="evidence-shot" src="evidence/%s">' % png_name)
         if located["html"]:
-            html_name = copy_evidence_file(located["html"], ev_dir, "schumer_account_opening.html")
+            html_name = copy_evidence_file(located["html"], ev_dir, "%s.html" % capture_prefix)
             parts.append('<p><a href="evidence/%s" target="_blank">Open captured HTML</a></p>'
                          % html_name)
         if located["txt"]:

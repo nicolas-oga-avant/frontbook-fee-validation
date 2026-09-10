@@ -366,11 +366,31 @@
               ]
             },
             "schumer_box_landing": {
-              "status": "blocked",
-              "attempts": [],
-              "blocked_on": [
-                "CSRV-5845",
-                "CSRV-5846"
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": null,
+                    "template_version": null,
+                    "render_mode": null,
+                    "mla_forced": false,
+                    "capture": "/Users/nicoga30/Source/avant/frontbook-fee-validation/evidence/run-0120/schumer_landing_0120.html",
+                    "control": "/Users/nicoga30/Source/avant/frontbook-fee-validation/evidence/run-0122/schumer_landing_0122.html"
+                  },
+                  "evidence_dir": "evidence/run-0120/",
+                  "assertions": [
+                    {
+                      "label": "schumer_box_landing value table (assert_schumer_box.py)",
+                      "status": "PASS",
+                      "expected": "ALL PASS",
+                      "actual": "ALL PASS",
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "0120-schumer_box_landing-1",
+                  "started_at": "2026-09-10T03:40:46+00:00"
+                }
               ]
             }
           }
@@ -1050,11 +1070,31 @@
               ]
             },
             "schumer_box_landing": {
-              "status": "blocked",
-              "attempts": [],
-              "blocked_on": [
-                "CSRV-5845",
-                "CSRV-5846"
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": null,
+                    "template_version": null,
+                    "render_mode": null,
+                    "mla_forced": false,
+                    "capture": "/Users/nicoga30/Source/avant/frontbook-fee-validation/evidence/run-0122/schumer_landing_0122.html",
+                    "control": null
+                  },
+                  "evidence_dir": "evidence/run-0122/",
+                  "assertions": [
+                    {
+                      "label": "schumer_box_landing value table (assert_schumer_box.py)",
+                      "status": "PASS",
+                      "expected": "ALL PASS",
+                      "actual": "ALL PASS",
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "0122-schumer_box_landing-1",
+                  "started_at": "2026-09-10T03:40:31+00:00"
+                }
               ]
             }
           }
@@ -1499,11 +1539,31 @@
               ]
             },
             "schumer_box_landing": {
-              "status": "blocked",
-              "attempts": [],
-              "blocked_on": [
-                "CSRV-5845",
-                "CSRV-5846"
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": null,
+                    "template_version": null,
+                    "render_mode": null,
+                    "mla_forced": false,
+                    "capture": "/Users/nicoga30/Source/avant/frontbook-fee-validation/evidence/run-3302/schumer_landing_3302.html",
+                    "control": "/Users/nicoga30/Source/avant/frontbook-fee-validation/evidence/run-3303/schumer_landing_3303.html"
+                  },
+                  "evidence_dir": "evidence/run-3302/",
+                  "assertions": [
+                    {
+                      "label": "schumer_box_landing value table (assert_schumer_box.py)",
+                      "status": "PASS",
+                      "expected": "ALL PASS",
+                      "actual": "ALL PASS",
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "3302-schumer_box_landing-1",
+                  "started_at": "2026-09-10T03:41:18+00:00"
+                }
               ]
             }
           }
@@ -1864,11 +1924,31 @@
               ]
             },
             "schumer_box_landing": {
-              "status": "blocked",
-              "attempts": [],
-              "blocked_on": [
-                "CSRV-5845",
-                "CSRV-5846"
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": null,
+                    "template_version": null,
+                    "render_mode": null,
+                    "mla_forced": false,
+                    "capture": "/Users/nicoga30/Source/avant/frontbook-fee-validation/evidence/run-3303/schumer_landing_3303.html",
+                    "control": null
+                  },
+                  "evidence_dir": "evidence/run-3303/",
+                  "assertions": [
+                    {
+                      "label": "schumer_box_landing value table (assert_schumer_box.py)",
+                      "status": "PASS",
+                      "expected": "ALL PASS",
+                      "actual": "ALL PASS",
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "3303-schumer_box_landing-1",
+                  "started_at": "2026-09-10T03:41:02+00:00"
+                }
               ]
             }
           }
@@ -2899,11 +2979,31 @@
               ]
             },
             "schumer_box_landing": {
-              "status": "blocked",
-              "attempts": [],
-              "blocked_on": [
-                "CSRV-5845",
-                "CSRV-5846"
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": null,
+                    "template_version": null,
+                    "render_mode": null,
+                    "mla_forced": false,
+                    "capture": "/Users/nicoga30/Source/avant/frontbook-fee-validation/evidence/run-3219/schumer_landing_3219.html",
+                    "control": "/Users/nicoga30/Source/avant/frontbook-fee-validation/evidence/run-3220/schumer_landing_3220.html"
+                  },
+                  "evidence_dir": "evidence/run-3219/",
+                  "assertions": [
+                    {
+                      "label": "schumer_box_landing value table (assert_schumer_box.py)",
+                      "status": "PASS",
+                      "expected": "ALL PASS",
+                      "actual": "ALL PASS",
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "3219-schumer_box_landing-1",
+                  "started_at": "2026-09-10T03:41:50+00:00"
+                }
               ]
             }
           }
@@ -3264,11 +3364,31 @@
               ]
             },
             "schumer_box_landing": {
-              "status": "blocked",
-              "attempts": [],
-              "blocked_on": [
-                "CSRV-5845",
-                "CSRV-5846"
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": null,
+                    "template_version": null,
+                    "render_mode": null,
+                    "mla_forced": false,
+                    "capture": "/Users/nicoga30/Source/avant/frontbook-fee-validation/evidence/run-3220/schumer_landing_3220.html",
+                    "control": null
+                  },
+                  "evidence_dir": "evidence/run-3220/",
+                  "assertions": [
+                    {
+                      "label": "schumer_box_landing value table (assert_schumer_box.py)",
+                      "status": "PASS",
+                      "expected": "ALL PASS",
+                      "actual": "ALL PASS",
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "3220-schumer_box_landing-1",
+                  "started_at": "2026-09-10T03:41:34+00:00"
+                }
               ]
             }
           }
