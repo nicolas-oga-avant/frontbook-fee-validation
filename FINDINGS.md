@@ -1316,3 +1316,43 @@ before ever reaching RPF).
 own gating: `NOT CAPTURED` when no live SDK key is present, a real PASS/FAIL only once one is -
 a hard FAIL on every local Run would have been exactly the plausible-looking-but-wrong result
 FINDINGS #36 already exists to avoid, now avoided for this point too.
+
+**Third correction, 2026-09-10, and this one casts real doubt on the root cause above.** Once a
+live `OPTIMIZELY_SDK_KEY` was actually wired into a container (`.env.local` + the
+`docker-compose.override.yml` passthrough - see "when you fix something, make it persist" below),
+two things were true at once:
+
+- On `feature/CSRV-5914-cma-never-discloses-returned-payment-fee` (`cma_log_id` 7, `0122`,
+  `render_mode: approved`, rendered 2026-09-10T16:39): the paragraph and summary-box row render
+  correctly, and for the first time the `rpf` numeric block is a real recorded PASS
+  (`can_assess_rpf_fees: true`), not `NOT CAPTURED`. This is genuine, verified evidence the fix
+  branch works - see the PR #6112 comment for the screenshot.
+- **On `main` - no code change at all** (`cma_log_id` 142 and 144, same code, same template
+  version, `render_mode: approved`, rendered 2026-09-10T11:05 and T16:02, provenance carries no
+  `branch` key so this ran against the default checkout): the raw HTML **also** contains the full
+  "Returned Payment Fee." paragraph and the summary-box row, byte-for-byte the same text as the
+  fixed branch. Re-grepped `cma_input_helper.rb` / `cardmember_agreement_inputs.rb` on this exact
+  `main` checkout at the time: still zero references to `card_rpf_eligible`, `rpf_fee_eligible?`,
+  or RPF of any kind - only `lib/avant/email/data_renderer.rb` and `credit_card_account.rb`'s own
+  method definitions mention it, exactly as before the PR.
+
+That is a direct contradiction of this finding's own "actual root cause" section above: if the
+CMA-rendering code path never supplies `card_rpf_eligible` on `main`, and the paragraph still
+renders correctly there, then the Liquid gate is not blocked on a variable this repo's code was
+ever responsible for supplying - the "wiring gap between two rendering pipelines" theory does not
+explain what actually renders. `TemplateflowEngine::Client.get_template_details` only returns the
+template's declared variable list and metadata, not its Liquid source, so the real gating
+mechanism (how the template decides to show this paragraph without the CMA path ever setting
+`card_rpf_eligible`) was not directly inspected here and remains unconfirmed - candidate
+explanations include a TemplateFlow-side Optimizely check independent of the variables this app
+supplies, or the audience becoming eligible for these 28 codes on 2026-09-09 mattering more than
+believed. What is confirmed, not inferred: the original symptom (spotted on `0122`, no RPF
+disclosure anywhere) is reproducible only in the absence of a live Optimizely key, on `main`
+*and* on the fix branch alike - i.e. it looks like the FINDINGS #36 local-environment limitation,
+not a production defect, and CSRV-5914's premise ("never discloses it, for any account, any
+pricing strategy, any environment") has not been verified against production and should be
+treated as unconfirmed pending someone checking a real production or staging render. The PR's
+code change is still correct and harmless (it computes the same two variables
+`Avant::Email::DataRenderer` already does, the same way), but merging it should not be presented
+as "the fix" for a defect whose existence in production is now in doubt. See the PR #6112 comment
+and the CSRV-5914 ticket comment posted the same day for the fuller writeup.
