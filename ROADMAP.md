@@ -592,6 +592,20 @@ to support.
       342s wall (090+084+084+084s, fully sequential); concurrency 2 = 173s wall (both Pairs
       overlapping) - essentially 2x, negligible contention overhead. Verified 2026-09-10 on
       3303/3302 + 3M33/3M32 (c1) vs 3220/3219 + 3M90/3M89 (c2).
+- [x] Measured concurrency 4 too, once the host specs (`sysctl`: 10 CPU, 34GB RAM, Docker
+      allocated all 10/15.66GB, load average ~3.9 - plenty of headroom) ruled out the host
+      itself as the likely limit. The real candidate bottleneck was the *shared* Rails app all
+      concurrent Runs hit (`basic-web`, one container, Puma's default 2 workers x 16 threads -
+      true CPU-bound Ruby parallelism caps at 2 processes regardless of host cores). Measured
+      anyway rather than assumed either way (rule 5): 4 Pairs / 8 codes, all `direct`
+      (5217/5216, 7213/7212, 7105/7104, 9004/9003), concurrency 4 = 235s wall - matching a
+      single lane's own solo duration (~235-236s) almost exactly, i.e. all four lanes ran with
+      no measurable queuing at the shared Puma workers. Clear win over concurrency 2 (~470s
+      projected for the same 8-code batch, two sequential rounds) and no new flakiness - the 4
+      FAILs are the same known pre-existing backbook FTF-absence gap (rule 2), not a
+      concurrency artifact. Per-code time rose from ~84-90s to ~111-124s here vs the c1/c2
+      measurement above - that is `schumer_box_landing`'s new real capture+assert step landing
+      in between the two measurements, not a concurrency regression.
 - [x] `--concurrency 1` works as a clean-reproduction fallback - the baseline run above submitted
       lanes in the same relative order as the pre-concurrency flat schedule and a single worker
       drained them one at a time, byte-for-byte the old sequential behavior (342s = exact sum of
