@@ -118,6 +118,9 @@ STYLE = """
   .badge-trusted-render { background: #1f8a4c; }
   .badge-check-render { background: #b8860b; }
   .badge-unknown-render { background: #8a8f98; }
+  .badge-mechanical { background: #b8860b; }
+  .badge-assertion { background: #c0392b; }
+  .badge-environment { background: #6b2fa0; }
   details > summary { cursor: pointer; font-weight: 600; margin: 8px 0; }
   iframe.cma-render { width: 100%; height: 900px; border: 1px solid #ccc; border-radius: 4px; }
   pre { background: #f4f4f5; border: 1px solid #ddd; border-radius: 4px; padding: 10px;
