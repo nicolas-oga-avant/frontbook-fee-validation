@@ -1285,12 +1285,34 @@ rendered cardmember agreement never mentions "returned payment" anywhere - confi
 
 So the template expects `card_rpf_eligible` to gate the paragraph, and the CMA-rendering code
 path never computes or supplies it - for any account, any pricing strategy, any environment. An
-undefined Liquid variable reads as falsy, so the gated paragraph is skipped. **This is not
-launch-specific, not code-specific, and not an Optimizely-eligibility business decision - it
-looks like a wiring gap between two independent rendering systems (servicing emails vs. the CMA
-letter) that both need the same eligibility flag, where only one of them was ever wired to
-compute it.** Not yet confirmed against the live Liquid template source itself (only its
-variable list), and not fixed here (hard rule 2, and well outside this repo's scope) - this
-belongs with whoever owns `cardmember_agreement_letter.rb` / `cma_input_helper.rb` and the CMA
-template, as a likely production defect affecting every issued card, not only this launch's 28
-codes.
+undefined Liquid variable reads as falsy, so the gated paragraph is skipped. This is not
+launch-specific, not code-specific, and not an Optimizely-eligibility business decision - a
+wiring gap between two independent rendering systems (servicing emails vs. the CMA letter) that
+both need the same eligibility flag, where only one of them was ever wired to compute it. Filed
+as CSRV-5914, and not fixed here (hard rule 2, and well outside this repo's scope).
+
+**Fix verified 2026-09-10, `feature/CSRV-5914-cma-never-discloses-returned-payment-fee`.** The
+PR (`cc864ff41`) adds `card_rpf_eligible: rpf_fee_eligible?` and
+`card_rpf_maximum_fee_amount: Money.new(rpf_maximum_fee_amount_cents).to_f` to
+`generate_cardmember_agreement_inputs` - exactly the two variables the template expects, computed
+exactly the way `Avant::Email::DataRenderer` already does it correctly. Bootstrapped the branch
+(avant-basic only; credit-card-api/crm fall back to main, as expected - the fix is
+avant-basic-only) and re-ran `0122`. The paragraph still does not render locally, but this is now
+expected, not a fix failure: inspecting the actual `template_variables` of the real render
+(`bin/rails runner`, reading the `CardmemberAgreementLog` row directly) shows `card_rpf_eligible`
+is now present - the wiring gap is closed - with value `false`, for the exact same reason
+`rpf_point`'s own numeric check already reports "not verifiable on this stack" (FINDINGS #36):
+no live Optimizely SDK key locally, so `rpf_fee_eligible?` answers from the committed, stale
+datafile snapshot that predates this campaign's codes, regardless of what the live audience says
+(confirmed via Optimizely MCP: the live "RPF/NSF Eligible Card Accounts" audience already
+includes all 28 - see above). The PR's own commit message reports RSpec coverage for both the
+eligible and non-eligible cases, 98 examples passing with no regressions - the eligible-case
+render was not independently reproduced here (attempts via a one-off `bin/rails runner` process
+hit an unrelated crash: that process boots without the Optimizely client initialized at all,
+failing on an unrelated `cma_show_promotion_dyl?` call inside the same input-generation method,
+before ever reaching RPF).
+
+`scripts/assert_value_table.py`'s new check (`_rpf_paragraph_check`) now mirrors `rpf_point`'s
+own gating: `NOT CAPTURED` when no live SDK key is present, a real PASS/FAIL only once one is -
+a hard FAIL on every local Run would have been exactly the plausible-looking-but-wrong result
+FINDINGS #36 already exists to avoid, now avoided for this point too.

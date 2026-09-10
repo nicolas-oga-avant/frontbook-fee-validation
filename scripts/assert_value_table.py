@@ -211,7 +211,31 @@ def agreement_inputs_point(row, obs):
 
 # --- point 4: the rendered agreement -----------------------------------------------------
 
-def rendered_point(row, path):
+def _rpf_paragraph_check(row, text, side, obs):
+    """Whether the CMA discloses the Returned Payment Fee - a real check, but gated by the
+    same live-Optimizely-SDK-key fact as rpf_point below, and for the same reason.
+
+    Confirmed 2026-09-10 (CSRV-5914's fix, verified against its own feature branch): the CMA
+    template gates this paragraph on `card_rpf_eligible`, sourced from
+    `CreditCardAccount#rpf_fee_eligible?` -> Optimizely's `card_rpf_fees` decision. Inspected
+    the actual template_variables of a real successful render on the fix branch - the key is
+    now present (the wiring gap FINDINGS #40 documented is fixed), and its value is `false`
+    locally, for the same reason rpf_point's own numeric check is `false` locally: no live SDK
+    key, so the committed datafile snapshot answers, and it predates this campaign's codes
+    (FINDINGS #36). A hard FAIL here on every local Run would be exactly the same
+    plausible-looking-but-wrong result FINDINGS #36 already exists to avoid - so this
+    degrades to the same UNVERIFIABLE status as that point, not silently PASS, until this
+    stack has a live key.
+    """
+    if not (obs or {}).get("rpf", {}).get("sdk_key_present"):
+        return ("returned payment fee paragraph - not verifiable on this stack, same reason "
+                "as RPF (FINDINGS #36): no live Optimizely SDK key locally", UNVERIFIABLE,
+                "present if card_rpf_eligible (Optimizely) is true", None)
+    return _check("returned payment fee paragraph", True,
+                  sentence("rpf_disclosure_paragraph", side) in text)
+
+
+def rendered_point(row, path, obs=None):
     """The five template sites, as whole sentences from the redline.
 
     A backbook Run asserts the three sites the redline states pre-change text for. The two
@@ -239,13 +263,7 @@ def rendered_point(row, path):
                         late_fee_subsequent=late["late_fee_subsequent"]) in text),
         _check("foreign transactions paragraph, %s wording" % side, True,
                sentence("foreign_transactions_paragraph", side, **amounts) in text),
-        # Unlike the three above, this text does not vary by code or by side - the redline
-        # never edits it (FINDINGS #40, corrected 2026-09-10). Asserted on every Run,
-        # frontbook and backbook alike, for exactly that reason: a launch-caused regression
-        # (the neighboring late-fee/FTF edits accidentally deleting this paragraph) would
-        # show up identically everywhere, which is exactly the pattern actually observed.
-        _check("returned payment fee paragraph", True,
-               sentence("rpf_disclosure_paragraph", side) in text),
+        _rpf_paragraph_check(row, text, side, obs),
     ]
 
     if frontbook:
@@ -366,7 +384,7 @@ def main():
         ("1. Confetti", confetti_point(row, args.confetti_env, args.offline)),
         ("2. Decisioned application", application_point(row, obs)),
         ("3. Agreement inputs", agreement_inputs_point(row, obs)),
-        ("4. Rendered agreement", rendered_point(row, rendered)),
+        ("4. Rendered agreement", rendered_point(row, rendered, obs)),
         ("5. CSP labels", csp_point(row, obs)),
     ]
     rpf_rows = rpf_point(row, obs)
