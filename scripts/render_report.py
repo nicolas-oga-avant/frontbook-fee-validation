@@ -358,12 +358,21 @@ def pair_headline_diff(backbook_expected, frontbook_expected):
 
 
 def pair_verdict(pair):
+    """PASS requires every APPLICABLE cell to be `passed` - not literally all 10. An MLA code
+    has no strategy uuid, so schumer_box_basic/schumer_box_apply/schumer_box_landing are not
+    unrun or unproven for it, they are genuinely inapplicable (FINDINGS #8) - that is a fact
+    about the code, not a gap in validation, and treating it as one would make every MLA Pair
+    permanently unable to reach PASS regardless of how much real work gets done. Confirmed
+    2026-09-10 by scanning the whole Manifest: not_applicable never appears on a direct code, so
+    this relaxation cannot silently paper over a real direct-code gap - it only recognizes a
+    fact already true and already trusted everywhere else in this pipeline (is_mla drives
+    whether these same three surfaces are even attempted in the first place)."""
     statuses = []
     for role in ("backbook", "frontbook"):
         run = pair["runs"][role]
         for s in SURFACES:
             statuses.append(run["surfaces"][s]["status"])
-    if all(s == "passed" for s in statuses):
+    if all(s in ("passed", "not_applicable") for s in statuses):
         return "pass"
     if any(s in ("failed", "halted") for s in statuses):
         return "attention"
@@ -437,7 +446,8 @@ def render_root_index(doc):
 <title>Frontbook fee launch validation</title>%s</head><body>
 <h1>Frontbook fee launch validation</h1>
 <p class="meta">Generated %s - seeded from %s - database %s / %s - %d of %d Pairs fully PASS
-(strict: every one of 10 Surface cells passed)</p>
+(strict: every applicable Surface cell passed - not_applicable cells, e.g. an MLA code's
+Schumer surfaces, do not block PASS, but a failed/halted/blocked/pending one does)</p>
 %s
 </body></html>""" % (
         STYLE, esc(datetime.now(timezone.utc).isoformat(timespec="seconds")),

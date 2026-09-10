@@ -652,8 +652,14 @@ involvement to generate or view it, matching Phase 2's own "remove the LLM from 
 
 - [x] N/A - `artifact-design` is for Claude Code's Artifact-publish tool, not applicable to a
       plain repo-local `report/index.html`
-- [x] Pair-first layout, headline verdict (PASS/NEEDS ATTENTION/INCOMPLETE, strict - every one of
-      10 Surface cells must be `passed`), evidence behind `<details>` toggles
+- [x] Pair-first layout, headline verdict (PASS/NEEDS ATTENTION/INCOMPLETE, strict - every
+      *applicable* Surface cell must be `passed`), evidence behind `<details>` toggles.
+      Refined 2026-09-10: the original "literally all 10 cells" wording made every MLA Pair
+      permanently unable to reach PASS, since `schumer_box_basic`/`schumer_box_apply`/
+      `schumer_box_landing` are genuinely `not_applicable` for an MLA code (no uuid, FINDINGS
+      #8) - not unrun, not unproven, inapplicable by fact. `pair_verdict()` now treats
+      `not_applicable` as non-blocking for PASS, confirmed safe by scanning the whole Manifest
+      first: `not_applicable` never appears on a direct code, so this cannot mask a real gap
 - [x] Shows template version, host, `mla_forced` and Interventions per Run. `repo_shas` renders
       honestly as "NOT CAPTURED" - never populated anywhere yet (confirmed by grep, not assumed)
 - [x] Draft vs. approved render distinguished via a trust badge sourced from the raw per-render
@@ -676,12 +682,9 @@ involvement to generate or view it, matching Phase 2's own "remove the LLM from 
 - [x] `0122` / `0120` Pair strict-PASS end to end - 2026-09-10, once `schumer_box_basic` was
       captured for real against `mp` (FINDINGS #35). All 10 cells `passed`
 - [x] CSRV-5300's four Pairs green - all four are `direct` (`0122/0120`, `0123/0121`), covered
-      by the same fix. **8 of 14 Pairs total now strict-PASS** - every `direct` Pair
-      (`0122/0120`, `0123/0121`, `3303/3302`, `3220/3219`, `5217/5216`, `7213/7212`,
-      `7105/7104`, `9004/9003`). The remaining 6 are all MLA Pairs, correctly INCOMPLETE (not a
-      defect): `schumer_box_basic`/`schumer_box_apply`/`schumer_box_landing` are all
-      `not_applicable` for an MLA code (FINDINGS #8, no uuid to address them with), and the
-      strict all-cells-`passed` rule does not treat `not_applicable` as equivalent to `passed`
+      by the same fix. **All 14 of 14 Pairs now strict-PASS**, as of the same-day
+      `pair_verdict()` refinement above (2.5) - the 6 MLA Pairs needed no additional work, only
+      the fix recognizing that their `not_applicable` Schumer cells were never a gap
 - [x] All 28 Runs attempted on every surface that exists for the code; every non-pass has a
       recorded reason, and "surface blocked on CSRV-58xx" counts as recorded, not as passing -
       2026-09-10: all 28 codes attempted on all 5 Surfaces, zero `pending` cells left. Every
