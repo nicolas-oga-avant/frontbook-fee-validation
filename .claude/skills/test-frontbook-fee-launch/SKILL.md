@@ -1,6 +1,6 @@
 ---
 name: test-frontbook-fee-launch
-description: Runs one end-to-end frontbook fee launch validation locally for a given pricing strategy code - sets up the stack from nothing, drives a card application to approval in the browser, issues the card, renders the cardmember agreement, and asserts the fee content. By default it runs every Surface implemented for that code (today, that is the cardmember agreement); pass a Surface name to run just one, e.g. "just check the cma surface for 0122" or "run predecisioned_terms for 3M33". Use when asked to "validate strategy 0122", "test the frontbook fee launch", "run the fee validation for CSRV-5300/5301/5302/5303", to check that a backbook code still renders $28/$39 with no foreign transaction fee, or to check one specific surface (cma, predecisioned_terms, schumer_box_basic, schumer_box_apply, schumer_box_landing). The cma/predecisioned_terms/schumer_box_apply apply-through-render-through-assert-through-record chain runs as one script call (scripts/run_validation.py) with zero browser-harness tool calls; the LLM still picks the code, decides which Surfaces apply, and drives a stage by hand if that script halts. Renders go against production TemplateFlow in preview mode, picking up the latest draft of the template.
+description: Runs one end-to-end frontbook fee launch validation locally for a given pricing strategy code - sets up the stack from nothing, drives a card application to approval in the browser, issues the card, renders the cardmember agreement, and asserts the fee content across all five Surfaces (cma, predecisioned_terms, schumer_box_apply, schumer_box_basic, schumer_box_landing). Use when asked to "validate strategy 0122", "test the frontbook fee launch", "run the fee validation for CSRV-5300/5301/5302/5303", "validate the whole campaign"/all 28 codes, to check that a backbook code still renders $28/$39 with no foreign transaction fee, or to check one specific surface. One code is one script call (scripts/run_validation.py); every code is one script call (scripts/run_campaign.py) - both produce and record every applicable Surface with zero browser-harness tool calls and no Surface-applicability judgment left to make (MLA-forced, route-blocked and route-now-resolved are all decided by a live check, not assumed). The LLM still picks the code/scope and drives a stage by hand if a script halts. Renders go against production TemplateFlow in preview mode, picking up the latest draft of the template.
 ---
 
 # Frontbook fee launch validation - one Run
@@ -15,12 +15,15 @@ runs apply (via `scripts/run_apply_standalone.py` - its own throwaway Chrome, ze
 tool calls, ROADMAP 2.1; this same walk also captures the account-opening Schumer box for free),
 console (approve/issue/render, `scripts/console_runner.rb`, unchanged), the value-table and Schumer
 box assertions, and all three Surfaces' `manifest.py record` calls, in one call - see
-`surfaces/cma.md`'s top note. What is still yours: picking the code, choosing which Surfaces apply,
+`surfaces/cma.md`'s top note. The same call also live-probes `schumer_box_basic` and
+`schumer_box_landing` and records those two too (`blocked`, `not_applicable`, or `not_implemented`
+if the route now resolves) - neither has a capture/assert step wired in yet, but nothing about
+their status needs recording by hand anymore either. What is still yours: picking the code,
 reading the result, and driving a stage by hand (`surfaces/cma.md` Steps 3-4, or the browser-harness
 form of the apply walk) when `run_validation.py` halts - it prints which stage failed and re-raises
 rather than guessing. `ROADMAP.md` 2.3 tracks what is still open (failure classification beyond
-Mechanical vs. halted, resume); `schumer_box_basic` (unreachable on `main`, FINDINGS #35) and
-`schumer_box_landing` (blocked on unshipped tickets) are not wired into that script at all.
+Mechanical vs. halted, resume). Running every code that needs it, not just one, is
+`scripts/run_campaign.py` - see "Running the whole Campaign" below.
 
 ## Before anything: the one rule
 
@@ -153,9 +156,11 @@ python3 scripts/manifest.py record 0122 cma passed --attempt-json '{
 }'
 python3 scripts/manifest.py record 3M33 predecisioned_terms passed --attempt-json '{"stage": "asserted"}'
 python3 scripts/manifest.py record 0122 schumer_box_apply failed --attempt-json '{"stage": "asserted"}'
-python3 scripts/manifest.py record 0122 schumer_box_basic blocked --blocked-on "dev-mp-only, see FINDINGS #35"
-python3 scripts/manifest.py record 0122 schumer_box_landing blocked --blocked-on CSRV-5845,CSRV-5846
 ```
+
+`schumer_box_basic` and `schumer_box_landing` do not need this by hand - `run_validation.py`
+records both automatically, every Run, from a live probe of each surface's own URL (see the note
+above and `surfaces/schumer_box_basic.md` / `surfaces/schumer_box_landing.md`).
 
 `record` touches only the one `(code, surface)` cell named - every other Surface's status and
 Attempt history is left exactly as it was. That is the whole mechanism: nothing about running
@@ -169,11 +174,9 @@ append-only Attempt rule (AGENTS.md rule 1) can be silently violated by a slippe
   `python3 scripts/manifest.py report 0122` first. If `cma`, `predecisioned_terms` or
   `schumer_box_apply` is not already `passed` under the current Template Version, run
   `python3 scripts/run_validation.py 0122` once - it produces and records all three from one
-  applied application (see below). `schumer_box_apply` comes back `not_applicable` on its own for
-  an MLA-forced code (no strategy uuid, FINDINGS #8) - nothing to do there. For the two remaining
-  Surfaces (`schumer_box_basic`, `schumer_box_landing` - not wired into that script), follow each
-  one's own procedure (`surfaces/*.md`) or record `not_applicable`/`not_implemented`/`blocked` by
-  name and, if blocked, by ticket. Never silently narrow a full validation down to just the CMA.
+  applied application (see below), and records `schumer_box_basic`/`schumer_box_landing` too (a
+  live probe, not an assumption - see the note above). Never silently narrow a full validation
+  down to just the CMA.
 - **Scoped** ("just check the cma surface for 0122", "run predecisioned_terms for 3M33", or
   `--surface cma,predecisioned_terms`): if the named Surface is `cma`, `predecisioned_terms` or
   `schumer_box_apply`, `run_validation.py` is what to run either way - the three are produced by
@@ -194,9 +197,29 @@ append-only Attempt rule (AGENTS.md rule 1) can be silently violated by a slippe
   unchecked) if its frontbook sibling was already run through the same script, so its capture
   sits on disk as a `--control` - run the frontbook code of a Pair first when both are needed.
   Only fall back to `surfaces/cma.md` Steps 3-4's manual per-stage walk when `run_validation.py`
-  halts and something needs to be re-diagnosed by hand. The two remaining Schumer/landing
-  Surfaces need no application at all: they are read directly off the code's UUID from the
-  matrix row, once implemented.
+  halts and something needs to be re-diagnosed by hand. `schumer_box_basic` and
+  `schumer_box_landing` need no application at all - if one of those is the *only* Surface asked
+  for, `python3 scripts/run_validation.py <CODE> --check-schumer-static` records just those two
+  from a live probe, without the apply+console walk the other three need.
+
+## Running the whole Campaign
+
+`scripts/run_campaign.py` is `run_validation.py` fanned out over every code in
+`data/run-matrix.csv` - one call for "validate everything", not one per code by hand:
+
+```bash
+python3 scripts/run_campaign.py --dry-run     # show the plan first - who's already passed, who isn't
+python3 scripts/run_campaign.py               # run everything the plan says still needs it
+python3 scripts/run_campaign.py --ticket CSRV-5300      # just one ticket's Pair(s)
+python3 scripts/run_campaign.py --codes 0122,0120       # just these codes
+```
+
+Runs sequentially, frontbook before backbook within each Pair (so a backbook code's
+`schumer_box_apply` control-pairing has teeth), skips anything already settled per the Manifest,
+does not stop the Campaign on one code's failure, and prints `manifest.py report` at the end. This
+is a long-running, resource-heavy call across all 28 codes (roughly 2-4 minutes each) - confirm
+with the user before kicking off the full, unfiltered run rather than assuming "validate the
+campaign" means right now.
 
 ## Assembling the report across Surfaces
 

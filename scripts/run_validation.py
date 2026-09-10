@@ -17,6 +17,15 @@ exactly as reported, never retried or reinterpreted. A raised exception anywhere
 console phase is a Mechanical Failure by definition - it is recorded `halted`, not silently
 swallowed, and always re-raised to the caller (assume silence means failure).
 
+Also auto-records `schumer_box_basic` and `schumer_box_landing` every Run - not from a hardcoded
+assumption, but from a live HTTP probe of each surface's own URL (apply_harness.py's
+surface_urls()), because both surfaces' "blocked" status is conditional, not a platform constant:
+`schumer_box_basic` blocks only because this repo runs off `main` (FINDINGS #35 - the route is
+`mp`-only, and already has a proven checker there), and `schumer_box_landing` blocks on two tickets
+this repo does not control the shipping of (CSRV-5845/5846). A hardcoded "blocked" would silently
+go stale the day either changes - the same silent-failure trap AGENTS.md's central rule warns
+about, just aimed at this script's own assumptions instead of the platform's.
+
 Scope: `cma`, `predecisioned_terms` and `schumer_box_apply`, from one applied application.
 `predecisioned_terms` IS assert_value_table.py's point "2. Decisioned application" - already
 computed here, just recorded under its own name too (surfaces/predecisioned_terms.md).
@@ -56,12 +65,14 @@ import os
 import re
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)
 sys.path.insert(0, _HERE)
 
+import apply_harness                     # noqa: E402
 import manifest as manifest_mod          # noqa: E402
 import redline_text                      # noqa: E402
 import run_apply_standalone              # noqa: E402
@@ -118,6 +129,63 @@ def confetti_preflight(code, row, env="dev", timeout=10):
                                      "stale or unpromoted config" % (base_code, env))
 
     return {"uuid": uuid, "base_code": base_code, "env": env}
+
+
+def _probe_reachable(url, timeout=5):
+    """True if `url` renders something, False if it 404s - the only two answers that mean
+    anything here. Anything else (connection refused, timeout, a 500) raises RunFailed: the
+    stack being unreachable is not evidence that a surface is unbuilt, and must not be read as
+    one."""
+    try:
+        with urllib.request.urlopen(url, timeout=timeout):
+            return True
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return False
+        raise RunFailed("schumer_probe", "%s answered HTTP %d (not 404) - check manually"
+                         % (url, e.code))
+    except Exception as e:
+        raise RunFailed("schumer_probe", "could not reach %s: %s: %s"
+                         % (url, type(e).__name__, e))
+
+
+_STATIC_SCHUMER_SURFACES = (
+    # (manifest surface name, apply_harness.surface_urls() key, blocked_on if 404)
+    ("schumer_box_basic", "schumer_basic", ["dev-mp-only, see FINDINGS #35"]),
+    ("schumer_box_landing", "schumer_landing", ["CSRV-5845", "CSRV-5846"]),
+)
+
+
+def record_static_schumer_surfaces(code, row):
+    """schumer_box_basic and schumer_box_landing need no application - just the code's uuid
+    (surfaces/schumer_box_basic.md, surfaces/schumer_box_landing.md) - so they are recorded here
+    independent of whether apply/console/assert below succeeds. Each is probed live rather than
+    assumed: an MLA code is not_applicable (no uuid, FINDINGS #8, decided the same way as
+    schumer_box_apply); otherwise a 404 means still blocked (their own doc's tickets), and
+    anything else means the route now resolves - which is not a pass, since neither surface has
+    a capture/assert step wired into this script yet. That gets `not_implemented`, not a silent
+    `blocked`, so the day either ships this stops being wrong on its own rather than needing a
+    person to remember to flip it.
+    """
+    if not row.get("uuid"):
+        return {name: ("not_applicable", None) for name, _, _ in _STATIC_SCHUMER_SURFACES}
+
+    urls = apply_harness.surface_urls(code)
+    results = {}
+    for surface, key, blocked_on in _STATIC_SCHUMER_SURFACES:
+        url, _ = urls[key]
+        try:
+            reachable = _probe_reachable(url)
+        except RunFailed as e:
+            print("    %s: %s - not recorded this Run" % (surface, e.message))
+            continue
+        if reachable:
+            print("    %s: %s now resolves (not a 404) - needs implementing, not just "
+                  "recording (see surfaces/%s.md)" % (surface, url, surface))
+            results[surface] = ("not_implemented", None)
+        else:
+            results[surface] = ("blocked", blocked_on)
+    return results
 
 
 def _slug(branch):
@@ -250,6 +318,9 @@ def main():
                      help="run the full chain but do not write to data/manifest.json")
     ap.add_argument("--check-confetti", action="store_true",
                      help="only run the Confetti pre-flight and exit - no stack, no browser")
+    ap.add_argument("--check-schumer-static", action="store_true",
+                     help="only probe/record schumer_box_basic and schumer_box_landing and exit "
+                          "- no application, no browser")
     args = ap.parse_args()
 
     slug = _slug(args.branch)
@@ -277,12 +348,27 @@ def main():
             info["uuid"], info["base_code"], info["env"]))
         return 0
 
+    if args.check_schumer_static:
+        for surface, (status, blocked_on) in record_static_schumer_surfaces(args.code, row).items():
+            print("%s -> %s%s" % (
+                surface, status, " [%s]" % ",".join(blocked_on) if blocked_on else ""))
+            if not args.skip_manifest:
+                record_result(args.code, surface, status, blocked_on=blocked_on)
+        return 0
+
     is_mla = not row.get("uuid")
     if is_mla:
         print("code %s is MLA-forced: schumer_box_apply is not_applicable (no strategy uuid, "
               "FINDINGS #8)" % args.code)
         if not args.skip_manifest:
             record_result(args.code, "schumer_box_apply", "not_applicable")
+
+    if not args.skip_manifest:
+        print("[static] schumer_box_basic / schumer_box_landing (live probe, no application "
+              "needed)...")
+        for surface, (status, blocked_on) in record_static_schumer_surfaces(
+                args.code, row).items():
+            record_result(args.code, surface, status, blocked_on=blocked_on)
 
     stage = "confetti"
     try:

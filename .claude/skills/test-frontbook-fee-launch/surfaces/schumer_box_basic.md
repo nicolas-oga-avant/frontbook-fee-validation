@@ -18,12 +18,11 @@ this surface's own capture. It was run 2026-09-03 against the sibling `schumer_b
 with the box-rendered guard and the absence-check `NO TEETH` rule (4 of 4 discriminate) both
 holding. See `surfaces/schumer_box_apply.md`.
 
-**If asked to run this Surface today: say it is unreachable on `main` (dev-mp only), record it, and
-stop rather than running it against the wrong trunk.**
-
-```bash
-python3 scripts/manifest.py record <CODE> schumer_box_basic blocked --blocked-on "dev-mp-only, see FINDINGS #35"
-```
+`scripts/run_validation.py` records this Surface automatically every Run, from a live probe of
+`/schumer_box/<uuid>` (not from this file's `main`-only assumption, which would go stale the
+moment a Run points at `mp`) - `blocked` on a 404, `not_applicable` for an MLA code. If a Run
+against `mp` ever reports `not_implemented` instead, that is this surface's real signal to wire
+the capture below into `run_validation.py` - the route resolved, and nothing has ever asserted it.
 
 Once run against dev-mp, the capture and assertion are the same shape as `schumer_box_apply.md`'s:
 
