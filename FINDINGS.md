@@ -1239,3 +1239,33 @@ Still open: `run_validation.py` gives no special-cased error for this class of f
 have shown as a generic halted `SubmitFailed` before the fix); that's fine now that the underlying
 limit is gone, but worth remembering if `MAXIMUM_ALLOWED_PER_DAY_FROM_SAME_IP` is ever exceeded
 some *other* way this bypass doesn't cover.
+
+## 40. The rendered CMA never discloses the Returned Payment Fee - every code, not launch-related
+
+**Symptom, spotted by inspecting the report (not by an automated check - nothing in this repo
+asserts this).** The three standalone Schumer surfaces (`schumer_box_apply`,
+`schumer_box_basic`, `schumer_box_landing`) all disclose `Returned Payment Fee ... Up to $25` for
+every code, matching `data/run-matrix.csv`'s `expected_rpf` column (`$25`, uniform across all 28
+rows). The rendered cardmember agreement itself never mentions "returned payment" anywhere in the
+document, not just in its own embedded fee-summary table - confirmed by a case-insensitive search
+of the full rendered HTML, not just the box.
+
+**Not code-specific and not launch-specific.** Checked four renders spanning both roles and MLA:
+`0120`, `0122`, `3M33`, `7104`, `9004` - zero occurrences in every one. The CMA's own summary
+table lists exactly two Penalty Fees rows, `Late Fee` and `Overlimit Fee`; `Returned Payment Fee`
+is absent from the row list entirely, not merely blank. Since RPF is unrelated to CSRV-4119 (the
+redline changes only touch late fee and the foreign transaction fee - FINDINGS #10's own
+docstring), this is not a fee-launch regression; it looks like a pre-existing fact about the CMA
+template, present before this campaign and orthogonal to it, the same way FINDINGS #36 already
+treats RPF as "orthogonal to the five" assertion points.
+
+**Not asserted anywhere in this repo, and not fixed here (hard rule 2).** `assert_value_table.py`'s
+RPF point (FINDINGS #36) checks the Optimizely-sourced dollar amount, never whether the CMA
+document's own text discloses it. `assert_schumer_box.py`/`assert_cma_absence.py`'s redline
+sentences (`data/redline-assertions.json`) have no RPF entry at all - it was never part of what
+either checker looks for, on any surface. So this is a genuine coverage gap (RPF's textual
+presence in the CMA was never checked, one way or the other) layered under a genuine cross-surface
+content question (four surfaces describing the same product, one of them silent on a fee the
+other three charge) - which one is the source of truth, or whether the CMA discloses it elsewhere
+under different wording, is a question for whoever owns the CMA template/compliance content, not
+something to resolve by pattern-matching a different phrase and calling it found.
