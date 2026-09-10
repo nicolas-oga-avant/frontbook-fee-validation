@@ -134,7 +134,8 @@
             "templateflow_host": {"type": "string"},
             "template_version": {"type": ["string", "null"], "description": "git_sha_version of the rendered CMA template. THE epoch signal. Never inferred from a fee amount. Null for Surfaces that render nothing."},
             "repo_shas": {"type": "object", "additionalProperties": {"type": "string"}},
-            "mla_forced": {"type": "boolean"}
+            "mla_forced": {"type": "boolean"},
+            "branch": {"type": ["string", "null"], "description": "--branch this Attempt actually ran against (e.g. main, mp) - ROADMAP 1.8. Added 2026-09-10; Attempts recorded before that were all against main (mp bootstrap did not exist yet) but are not backfilled - absent there, not fabricated."}
           }
         },
         "assertions": {

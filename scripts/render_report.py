@@ -64,6 +64,7 @@ PROVENANCE_FIELD_LABELS = [
     ("mla_forced", "MLA forced"),
     ("capture", "Capture"),
     ("control", "Control (--control sibling capture)"),
+    ("branch", "Branch (--branch this Attempt ran against)"),
 ]
 
 
@@ -138,7 +139,13 @@ STYLE = """
 def render_provenance(provenance, surface_name, code):
     rows = []
     for key, label in PROVENANCE_FIELD_LABELS:
-        value = provenance[key]
+        # .get(), not [] - "branch" was added to the canonical envelope after 28 codes' worth
+        # of Attempts already existed (data/manifest.json, 2026-09-10). Every Attempt recorded
+        # by the current run_validation.py always carries it (None or a real value, same as
+        # every other field); a missing key means only "recorded before this field existed",
+        # never a producer regressing the shape, so it degrades to fmt()'s own NOT CAPTURED
+        # rather than raising - a legitimate one-time schema addition, not shape tolerance.
+        value = provenance.get(key)
         if key in ("capture", "control") and value:
             value = os.path.basename(value)
         rows.append("<tr><th>%s</th><td>%s</td></tr>" % (esc(label), fmt(value)))
@@ -247,9 +254,12 @@ def render_evidence_embed(surface_name, code, attempt, report_code_dir):
                 parts.append("<h4>Absence check (assert_cma_absence.py)</h4><pre>%s</pre>"
                              % esc(fh.read()))
 
-    elif surface_name in ("schumer_box_apply", "schumer_box_landing"):
-        capture_prefix = ("schumer_account_opening" if surface_name == "schumer_box_apply"
-                          else "schumer_landing")
+    elif surface_name in ("schumer_box_apply", "schumer_box_landing", "schumer_box_basic"):
+        capture_prefix = {
+            "schumer_box_apply": "schumer_account_opening",
+            "schumer_box_landing": "schumer_landing",
+            "schumer_box_basic": "schumer_basic",
+        }[surface_name]
         located = locate_schumer_evidence(code, capture_prefix, surface_name)
         if located["png"]:
             png_name = copy_evidence_file(located["png"], ev_dir, "%s.png" % capture_prefix)

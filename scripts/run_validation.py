@@ -282,11 +282,18 @@ def record_result(code, surface, status, attempt=None, blocked_on=None):
 
 
 def _provenance_envelope(templateflow_host=None, template_version=None, render_mode=None,
-                          mla_forced=None, capture=None, control=None):
+                          mla_forced=None, capture=None, control=None, branch=None):
     """One fixed key set for every Attempt's provenance, whichever of the three surfaces wrote
     it - a field that does not apply to a given surface is explicitly None (rendered "NOT
     CAPTURED" by scripts/render_report.py), never simply absent. That is what lets the report
-    read every provenance dict the same way, with no per-surface branching."""
+    read every provenance dict the same way, with no per-surface branching.
+
+    `branch` closes part of ROADMAP 1.8's "a Run is currently branch-flexible and branch-silent"
+    gap: every caller in this file passes args.branch (never inferred), so an Attempt says which
+    trunk it was proven against instead of leaving that to be assumed from context. Attempts
+    recorded before this field existed show it as NOT CAPTURED, honestly - every one of them was
+    in fact against `main` (mp bootstrap did not exist yet), but that is not backfilled here:
+    a fact never recorded is NOT CAPTURED, not a retroactively fabricated value (hard rule 5)."""
     return {
         "templateflow_host": templateflow_host,
         "template_version": template_version,
@@ -294,6 +301,7 @@ def _provenance_envelope(templateflow_host=None, template_version=None, render_m
         "mla_forced": mla_forced,
         "capture": capture,
         "control": control,
+        "branch": branch,
     }
 
 
@@ -350,6 +358,84 @@ def run_cma_absence(code, row, backbook_html, evidence_dir):
 
     return r.returncode == 0, {"control": control_path, "output_file": out_path,
                                "exit_code": r.returncode}
+
+
+def run_schumer_box_basic(code, row, evidence_dir, headless=None):
+    """schumer_box_basic, for real - only meaningful on branch=mp (FINDINGS #35: the route
+    exists only there). Same shape as run_schumer_box_landing: probed live first (still
+    `blocked` on a 404), then captured via a standalone Chrome
+    (run_schumer_landing_standalone.run_basic - SCHUMER_BASE, not overridden here, must already
+    point at the mp stack the caller brought up) and asserted with assert_schumer_box.py, same
+    frontbook-before-backbook --control rule as the other two Schumer surfaces. Never called for
+    an MLA code (no uuid, FINDINGS #8) or off `mp` - the caller decides both, before a browser is
+    even launched."""
+    url, _ = apply_harness.surface_urls(code)["schumer_basic"]
+    try:
+        reachable = _probe_reachable(url)
+    except RunFailed as e:
+        return "failed", {"reason": "probe: %s" % e.message}
+    if not reachable:
+        return "blocked", {"blocked_on": ["dev-mp-only, see FINDINGS #35"]}
+
+    try:
+        capture = run_schumer_landing_standalone.run_basic(code, headless=headless, out_root=None)
+    except Exception as e:
+        return "failed", {"reason": "capture failed: %s: %s" % (type(e).__name__, e)}
+
+    cmd = [sys.executable, os.path.join(_HERE, "assert_schumer_box.py"), capture["html"],
+           "--code", code]
+    control_path = None
+    if row["role"] != "new":
+        sibling = row["replaces_or_replaced_by"]
+        candidate = os.path.join(_ROOT, "evidence", "run-%s" % sibling,
+                                 "schumer_basic_%s.html" % sibling)
+        if os.path.exists(candidate):
+            control_path = candidate
+            cmd += ["--control", control_path]
+
+    os.makedirs(evidence_dir, exist_ok=True)
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    out_path = os.path.join(evidence_dir, "schumer_box_basic_%s.txt" % code)
+    with open(out_path, "w") as fh:
+        fh.write(r.stdout + r.stderr)
+
+    return "passed" if r.returncode == 0 else "failed", {
+        "capture": capture["html"], "control": control_path,
+        "output_file": out_path, "exit_code": r.returncode,
+    }
+
+
+def _handle_schumer_box_basic(args, row, evidence_dir):
+    """schumer_box_basic: real capture+assert only on branch=mp for a non-MLA code (the only
+    case FINDINGS #35 says the route exists at all); everywhere else, the existing cheap live
+    probe (record_static_schumer_surfaces, which already handles MLA -> not_applicable and
+    main -> blocked internally) is exactly right and unchanged."""
+    if args.branch != "mp" or not row.get("uuid"):
+        if not args.skip_manifest:
+            for surface, (status, blocked_on) in record_static_schumer_surfaces(
+                    args.code, row).items():
+                record_result(args.code, surface, status, blocked_on=blocked_on)
+        return
+
+    if args.skip_manifest:
+        return
+
+    print("[static] schumer_box_basic (mp branch - real capture, FINDINGS #35)...")
+    status, detail = run_schumer_box_basic(args.code, row, evidence_dir, headless=args.headless)
+    print("    schumer_box_basic -> %s" % status)
+    if status == "blocked":
+        record_result(args.code, "schumer_box_basic", "blocked", blocked_on=detail["blocked_on"])
+    else:
+        record_result(args.code, "schumer_box_basic", status, {
+            "stage": "asserted",
+            "provenance": _provenance_envelope(
+                mla_forced=False, capture=detail.get("capture"), control=detail.get("control"),
+                branch=args.branch,
+            ),
+            "evidence_dir": "evidence/run-%s/" % args.code,
+            "assertions": [_assertion_row(
+                "schumer_box_basic value table (assert_schumer_box.py)", status == "passed")],
+        })
 
 
 def run_schumer_box_apply(code, apply_result, row, evidence_dir):
@@ -477,6 +563,7 @@ def _handle_schumer_box_landing(args, row, is_mla, evidence_dir):
                 mla_forced=is_mla,
                 capture=landing_detail.get("capture"),
                 control=landing_detail.get("control"),
+                branch=args.branch,
             ),
             "evidence_dir": "evidence/run-%s/" % args.code,
             "assertions": [_assertion_row(
@@ -565,11 +652,9 @@ def _run(args):
         return 0
 
     if args.check_schumer_static:
-        for surface, (status, blocked_on) in record_static_schumer_surfaces(args.code, row).items():
-            print("%s -> %s%s" % (
-                surface, status, " [%s]" % ",".join(blocked_on) if blocked_on else ""))
-            if not args.skip_manifest:
-                record_result(args.code, surface, status, blocked_on=blocked_on)
+        # On --branch mp for a non-MLA code this is real (a standalone browser against the mp
+        # stack), not just a probe - see _handle_schumer_box_basic's own docstring.
+        _handle_schumer_box_basic(args, row, evidence_dir)
         return 0
 
     if args.check_schumer_landing:
@@ -583,11 +668,7 @@ def _run(args):
         if not args.skip_manifest:
             record_result(args.code, "schumer_box_apply", "not_applicable")
 
-    if not args.skip_manifest:
-        print("[static] schumer_box_basic (live probe, dev-mp-only, no application needed)...")
-        for surface, (status, blocked_on) in record_static_schumer_surfaces(
-                args.code, row).items():
-            record_result(args.code, surface, status, blocked_on=blocked_on)
+    _handle_schumer_box_basic(args, row, evidence_dir)
 
     landing_status = _handle_schumer_box_landing(args, row, is_mla, evidence_dir)
 
@@ -661,7 +742,7 @@ def _run(args):
             for surface in surfaces:
                 record_result(args.code, surface, "halted", {
                     "stage": stage,
-                    "provenance": _provenance_envelope(),
+                    "provenance": _provenance_envelope(branch=args.branch),
                     "failure": {"class": "mechanical", "step": stage, "summary": message},
                 })
         raise
@@ -726,6 +807,7 @@ def _run(args):
         render_mode=console_result["provenance"]["render_mode"],
         mla_forced=is_mla,
         control=absence_detail.get("control") if absence_detail else None,
+        branch=args.branch,
     )
     # Captured by explicit id, never re-derived from "the newest file in the directory"
     # (AGENTS.md hard rule 1) - evidence/run-<code>/ can and does hold more than one render
@@ -754,6 +836,7 @@ def _run(args):
                     mla_forced=is_mla,
                     capture=schumer_detail.get("capture"),
                     control=schumer_detail.get("control"),
+                    branch=args.branch,
                 ),
                 "handles": handles,
                 "evidence_dir": evidence_dir_rel,
