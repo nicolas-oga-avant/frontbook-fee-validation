@@ -1069,6 +1069,17 @@ part-way through an application and has no address of its own. It also sits in a
 window over a 740px table, so a plain screenshot clips off the fee rows - exactly the rows in
 question. `capture_surface(..., navigate=False, element="table.schumer-box")` handles both.
 
+**Correction, 2026-09-10 - the "part two" hardcoding on `mp` looks fixed.** Re-checked via
+`git show origin/mp:app/controllers/schumer_box_controller.rb` and its view (no worktree
+needed): the controller no longer depends on the missing `PricingStrategies::Service` file
+(#9) - it requires `avant/pricing_strategies/constants` instead - and the view now reads
+`@schumer_data[:foreign_transaction_fee]` / `[:late_fee_subsequent]` dynamically rather than
+hardcoding `None` / `AppConfig...max_late_payment`. `git log` on that view shows
+`CSRV-5841 add the 14 September frontbook pricing strategies [mp]`, merged 2026-09-03 - the
+same day this finding was written, likely just after or during this investigation. Not yet
+verified against a running `mp` stack - that is ROADMAP 1.8/2.6's open item, and this note is
+why it is worth trying rather than assuming still-broken.
+
 ## 36. Optimizely answers from a datafile committed to the repo, so RPF is unverifiable locally
 
 **Symptom.** A correctly issued `0122` account reads as RPF-ineligible with zero fee amounts:
