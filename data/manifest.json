@@ -1158,24 +1158,353 @@
           },
           "surfaces": {
             "cma": {
-              "status": "pending",
-              "attempts": []
+              "status": "failed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": "templateflow.boston.k8s.prd.app.avant.com",
+                    "template_version": "bd8382f5-fe63-409f-8d58-11104b01def5",
+                    "render_mode": "approved",
+                    "mla_forced": false,
+                    "capture": null,
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 29,
+                    "cca_id": 21,
+                    "cma_log_id": 40
+                  },
+                  "evidence_dir": "evidence/run-3302/",
+                  "assertions": [
+                    {
+                      "label": "strategy 3302 has a Confetti entry",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "apr cap",
+                      "status": "PASS",
+                      "expected": 0.3599,
+                      "actual": 0.3599,
+                      "passed": true
+                    },
+                    {
+                      "label": "param_to_id resolves the uuid to 3302",
+                      "status": "PASS",
+                      "expected": "3302",
+                      "actual": "3302",
+                      "passed": true
+                    },
+                    {
+                      "label": "decision path strategy",
+                      "status": "PASS",
+                      "expected": "3302",
+                      "actual": "3302",
+                      "passed": true
+                    },
+                    {
+                      "label": "apr",
+                      "status": "PASS",
+                      "expected": 35.99,
+                      "actual": 35.99,
+                      "passed": true
+                    },
+                    {
+                      "label": "annual_membership_fee (year one)",
+                      "status": "PASS",
+                      "expected": 0.0,
+                      "actual": 0.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "year two fee, annual or monthly",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": [
+                        39.0,
+                        0.0
+                      ],
+                      "passed": true
+                    },
+                    {
+                      "label": "maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
+                      "status": "PASS",
+                      "expected": 35.0,
+                      "actual": 35.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "cma_pricing_strategy_identifier",
+                      "status": "PASS",
+                      "expected": "3302",
+                      "actual": "3302",
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 28.0,
+                      "actual": 28.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": 39.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "late fee paragraph ($28/$39)",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "summary late fee ceiling, box introductory_annual_fee",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign transactions paragraph, old wording",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "summary row: ftf cell None, cash advance sentence intact",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "ftf disclosure absent - proven by assert_cma_absence.py, not here",
+                      "status": "NOT CAPTURED",
+                      "expected": "-",
+                      "actual": null,
+                      "passed": false
+                    },
+                    {
+                      "label": "late_fee_structure",
+                      "status": "PASS",
+                      "expected": "1st: up to $28 | Subsequent: up to $39",
+                      "actual": "1st: up to $28 | Subsequent: up to $39",
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    }
+                  ],
+                  "rpf": {
+                    "title": "RPF (orthogonal to the five)",
+                    "rows": [
+                      {
+                        "label": "Optimizely answered from a committed datafile snapshot (revision 1947), not a live pull - RPF is not verifiable on this stack (FINDINGS #36)",
+                        "status": "NO ANSWER",
+                        "expected": "$25",
+                        "actual": 0,
+                        "passed": false
+                      }
+                    ]
+                  },
+                  "attempt_id": "3302-cma-1",
+                  "started_at": "2026-09-10T02:57:29+00:00"
+                }
+              ]
             },
             "predecisioned_terms": {
-              "status": "pending",
-              "attempts": []
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": "templateflow.boston.k8s.prd.app.avant.com",
+                    "template_version": "bd8382f5-fe63-409f-8d58-11104b01def5",
+                    "render_mode": "approved",
+                    "mla_forced": false,
+                    "capture": null,
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 29,
+                    "cca_id": 21,
+                    "cma_log_id": 40
+                  },
+                  "evidence_dir": "evidence/run-3302/",
+                  "assertions": [
+                    {
+                      "label": "decision path strategy",
+                      "status": "PASS",
+                      "expected": "3302",
+                      "actual": "3302",
+                      "passed": true
+                    },
+                    {
+                      "label": "apr",
+                      "status": "PASS",
+                      "expected": 35.99,
+                      "actual": 35.99,
+                      "passed": true
+                    },
+                    {
+                      "label": "annual_membership_fee (year one)",
+                      "status": "PASS",
+                      "expected": 0.0,
+                      "actual": 0.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "year two fee, annual or monthly",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": [
+                        39.0,
+                        0.0
+                      ],
+                      "passed": true
+                    },
+                    {
+                      "label": "maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
+                      "status": "PASS",
+                      "expected": 35.0,
+                      "actual": 35.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "3302-predecisioned_terms-1",
+                  "started_at": "2026-09-10T02:57:29+00:00"
+                }
+              ]
             },
             "schumer_box_basic": {
-              "status": "pending",
-              "attempts": []
+              "status": "blocked",
+              "attempts": [],
+              "blocked_on": [
+                "dev-mp-only, see FINDINGS #35"
+              ]
             },
             "schumer_box_apply": {
-              "status": "pending",
-              "attempts": []
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": null,
+                    "template_version": null,
+                    "render_mode": null,
+                    "mla_forced": false,
+                    "capture": "/Users/nicoga30/Source/avant/frontbook-fee-validation/evidence/run-3302/schumer_account_opening_3302.html",
+                    "control": "/Users/nicoga30/Source/avant/frontbook-fee-validation/evidence/run-3303/schumer_account_opening_3303.html"
+                  },
+                  "handles": {
+                    "application_id": 29,
+                    "cca_id": 21,
+                    "cma_log_id": 40
+                  },
+                  "evidence_dir": "evidence/run-3302/",
+                  "assertions": [
+                    {
+                      "label": "schumer_box_apply value table (assert_schumer_box.py)",
+                      "status": "PASS",
+                      "expected": "ALL PASS",
+                      "actual": "ALL PASS",
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "3302-schumer_box_apply-1",
+                  "started_at": "2026-09-10T02:57:29+00:00"
+                }
+              ]
             },
             "schumer_box_landing": {
-              "status": "pending",
-              "attempts": []
+              "status": "blocked",
+              "attempts": [],
+              "blocked_on": [
+                "CSRV-5845",
+                "CSRV-5846"
+              ]
             }
           }
         },
@@ -1194,24 +1523,353 @@
           },
           "surfaces": {
             "cma": {
-              "status": "pending",
-              "attempts": []
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": "templateflow.boston.k8s.prd.app.avant.com",
+                    "template_version": "bd8382f5-fe63-409f-8d58-11104b01def5",
+                    "render_mode": "approved",
+                    "mla_forced": false,
+                    "capture": null,
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 28,
+                    "cca_id": 20,
+                    "cma_log_id": 38
+                  },
+                  "evidence_dir": "evidence/run-3303/",
+                  "assertions": [
+                    {
+                      "label": "strategy 3303 has a Confetti entry",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 30.0,
+                      "actual": 30.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 41.0,
+                      "actual": 41.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": 3.0,
+                      "actual": 3.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "apr cap",
+                      "status": "PASS",
+                      "expected": 0.3599,
+                      "actual": 0.3599,
+                      "passed": true
+                    },
+                    {
+                      "label": "param_to_id resolves the uuid to 3303",
+                      "status": "PASS",
+                      "expected": "3303",
+                      "actual": "3303",
+                      "passed": true
+                    },
+                    {
+                      "label": "decision path strategy",
+                      "status": "PASS",
+                      "expected": "3303",
+                      "actual": "3303",
+                      "passed": true
+                    },
+                    {
+                      "label": "apr",
+                      "status": "PASS",
+                      "expected": 35.99,
+                      "actual": 35.99,
+                      "passed": true
+                    },
+                    {
+                      "label": "annual_membership_fee (year one)",
+                      "status": "PASS",
+                      "expected": 0.0,
+                      "actual": 0.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "year two fee, annual or monthly",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": [
+                        39.0,
+                        0.0
+                      ],
+                      "passed": true
+                    },
+                    {
+                      "label": "maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
+                      "status": "PASS",
+                      "expected": 35.0,
+                      "actual": 35.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 30.0,
+                      "actual": 30.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 41.0,
+                      "actual": 41.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": 3.0,
+                      "actual": 3.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "cma_pricing_strategy_identifier",
+                      "status": "PASS",
+                      "expected": "3303",
+                      "actual": "3303",
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 30.0,
+                      "actual": 30.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 41.0,
+                      "actual": 41.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": 3.0,
+                      "actual": 3.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late fee paragraph ($30/$41)",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "summary late fee ceiling, box introductory_annual_fee",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign transactions paragraph, new wording",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "ftf disclosure paragraph",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "summary ftf row, box introductory_annual_fee",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_structure",
+                      "status": "PASS",
+                      "expected": "1st: up to $30 | Subsequent: up to $41",
+                      "actual": "1st: up to $30 | Subsequent: up to $41",
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": "3% of each foreign transaction",
+                      "actual": "3% of each foreign transaction",
+                      "passed": true
+                    }
+                  ],
+                  "rpf": {
+                    "title": "RPF (orthogonal to the five)",
+                    "rows": [
+                      {
+                        "label": "Optimizely answered from a committed datafile snapshot (revision 1947), not a live pull - RPF is not verifiable on this stack (FINDINGS #36)",
+                        "status": "NO ANSWER",
+                        "expected": "$25",
+                        "actual": 0,
+                        "passed": false
+                      }
+                    ]
+                  },
+                  "attempt_id": "3303-cma-1",
+                  "started_at": "2026-09-10T02:56:05+00:00"
+                }
+              ]
             },
             "predecisioned_terms": {
-              "status": "pending",
-              "attempts": []
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": "templateflow.boston.k8s.prd.app.avant.com",
+                    "template_version": "bd8382f5-fe63-409f-8d58-11104b01def5",
+                    "render_mode": "approved",
+                    "mla_forced": false,
+                    "capture": null,
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 28,
+                    "cca_id": 20,
+                    "cma_log_id": 38
+                  },
+                  "evidence_dir": "evidence/run-3303/",
+                  "assertions": [
+                    {
+                      "label": "decision path strategy",
+                      "status": "PASS",
+                      "expected": "3303",
+                      "actual": "3303",
+                      "passed": true
+                    },
+                    {
+                      "label": "apr",
+                      "status": "PASS",
+                      "expected": 35.99,
+                      "actual": 35.99,
+                      "passed": true
+                    },
+                    {
+                      "label": "annual_membership_fee (year one)",
+                      "status": "PASS",
+                      "expected": 0.0,
+                      "actual": 0.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "year two fee, annual or monthly",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": [
+                        39.0,
+                        0.0
+                      ],
+                      "passed": true
+                    },
+                    {
+                      "label": "maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
+                      "status": "PASS",
+                      "expected": 35.0,
+                      "actual": 35.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 30.0,
+                      "actual": 30.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 41.0,
+                      "actual": 41.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": 3.0,
+                      "actual": 3.0,
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "3303-predecisioned_terms-1",
+                  "started_at": "2026-09-10T02:56:05+00:00"
+                }
+              ]
             },
             "schumer_box_basic": {
-              "status": "pending",
-              "attempts": []
+              "status": "blocked",
+              "attempts": [],
+              "blocked_on": [
+                "dev-mp-only, see FINDINGS #35"
+              ]
             },
             "schumer_box_apply": {
-              "status": "pending",
-              "attempts": []
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": null,
+                    "template_version": null,
+                    "render_mode": null,
+                    "mla_forced": false,
+                    "capture": "/Users/nicoga30/Source/avant/frontbook-fee-validation/evidence/run-3303/schumer_account_opening_3303.html",
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 28,
+                    "cca_id": 20,
+                    "cma_log_id": 38
+                  },
+                  "evidence_dir": "evidence/run-3303/",
+                  "assertions": [
+                    {
+                      "label": "schumer_box_apply value table (assert_schumer_box.py)",
+                      "status": "PASS",
+                      "expected": "ALL PASS",
+                      "actual": "ALL PASS",
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "3303-schumer_box_apply-1",
+                  "started_at": "2026-09-10T02:56:05+00:00"
+                }
+              ]
             },
             "schumer_box_landing": {
-              "status": "pending",
-              "attempts": []
+              "status": "blocked",
+              "attempts": [],
+              "blocked_on": [
+                "CSRV-5845",
+                "CSRV-5846"
+              ]
             }
           }
         }
@@ -1236,23 +1894,316 @@
           },
           "surfaces": {
             "cma": {
-              "status": "pending",
-              "attempts": []
+              "status": "failed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": "templateflow.boston.k8s.prd.app.avant.com",
+                    "template_version": "bd8382f5-fe63-409f-8d58-11104b01def5",
+                    "render_mode": "approved",
+                    "mla_forced": true,
+                    "capture": null,
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 31,
+                    "cca_id": 23,
+                    "cma_log_id": 44
+                  },
+                  "evidence_dir": "evidence/run-3M32/",
+                  "assertions": [
+                    {
+                      "label": "strategy 3302 has a Confetti entry",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "apr cap",
+                      "status": "PASS",
+                      "expected": 0.3599,
+                      "actual": 0.3599,
+                      "passed": true
+                    },
+                    {
+                      "label": "code_to_mla maps 3302 to 3M32",
+                      "status": "PASS",
+                      "expected": "3M32",
+                      "actual": "3M32",
+                      "passed": true
+                    },
+                    {
+                      "label": "decision path strategy",
+                      "status": "PASS",
+                      "expected": "3302",
+                      "actual": "3302",
+                      "passed": true
+                    },
+                    {
+                      "label": "apr",
+                      "status": "PASS",
+                      "expected": 35.99,
+                      "actual": 35.99,
+                      "passed": true
+                    },
+                    {
+                      "label": "annual_membership_fee (year one)",
+                      "status": "PASS",
+                      "expected": 0.0,
+                      "actual": 0.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "year two fee, annual or monthly",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": [
+                        39.0,
+                        0.0
+                      ],
+                      "passed": true
+                    },
+                    {
+                      "label": "maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
+                      "status": "PASS",
+                      "expected": 35.0,
+                      "actual": 35.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "cma_pricing_strategy_identifier",
+                      "status": "PASS",
+                      "expected": "3M32",
+                      "actual": "3M32",
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 28.0,
+                      "actual": 28.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": 39.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "late fee paragraph ($28/$39)",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "summary late fee ceiling, box introductory_annual_fee",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign transactions paragraph, old wording",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "summary row: ftf cell None, cash advance sentence intact",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "ftf disclosure absent - proven by assert_cma_absence.py, not here",
+                      "status": "NOT CAPTURED",
+                      "expected": "-",
+                      "actual": null,
+                      "passed": false
+                    },
+                    {
+                      "label": "late_fee_structure",
+                      "status": "PASS",
+                      "expected": "1st: up to $28 | Subsequent: up to $39",
+                      "actual": "1st: up to $28 | Subsequent: up to $39",
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    }
+                  ],
+                  "rpf": {
+                    "title": "RPF (orthogonal to the five)",
+                    "rows": [
+                      {
+                        "label": "Optimizely answered from a committed datafile snapshot (revision 1947), not a live pull - RPF is not verifiable on this stack (FINDINGS #36)",
+                        "status": "NO ANSWER",
+                        "expected": "$25",
+                        "actual": 0,
+                        "passed": false
+                      }
+                    ]
+                  },
+                  "attempt_id": "3M32-cma-1",
+                  "started_at": "2026-09-10T03:00:17+00:00"
+                }
+              ]
             },
             "predecisioned_terms": {
-              "status": "pending",
-              "attempts": []
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": "templateflow.boston.k8s.prd.app.avant.com",
+                    "template_version": "bd8382f5-fe63-409f-8d58-11104b01def5",
+                    "render_mode": "approved",
+                    "mla_forced": true,
+                    "capture": null,
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 31,
+                    "cca_id": 23,
+                    "cma_log_id": 44
+                  },
+                  "evidence_dir": "evidence/run-3M32/",
+                  "assertions": [
+                    {
+                      "label": "decision path strategy",
+                      "status": "PASS",
+                      "expected": "3302",
+                      "actual": "3302",
+                      "passed": true
+                    },
+                    {
+                      "label": "apr",
+                      "status": "PASS",
+                      "expected": 35.99,
+                      "actual": 35.99,
+                      "passed": true
+                    },
+                    {
+                      "label": "annual_membership_fee (year one)",
+                      "status": "PASS",
+                      "expected": 0.0,
+                      "actual": 0.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "year two fee, annual or monthly",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": [
+                        39.0,
+                        0.0
+                      ],
+                      "passed": true
+                    },
+                    {
+                      "label": "maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
+                      "status": "PASS",
+                      "expected": 35.0,
+                      "actual": 35.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "3M32-predecisioned_terms-1",
+                  "started_at": "2026-09-10T03:00:17+00:00"
+                }
+              ]
             },
             "schumer_box_basic": {
-              "status": "pending",
+              "status": "not_applicable",
               "attempts": []
             },
             "schumer_box_apply": {
-              "status": "pending",
+              "status": "not_applicable",
               "attempts": []
             },
             "schumer_box_landing": {
-              "status": "pending",
+              "status": "not_applicable",
               "attempts": []
             }
           }
@@ -1272,23 +2223,316 @@
           },
           "surfaces": {
             "cma": {
-              "status": "pending",
-              "attempts": []
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": "templateflow.boston.k8s.prd.app.avant.com",
+                    "template_version": "bd8382f5-fe63-409f-8d58-11104b01def5",
+                    "render_mode": "approved",
+                    "mla_forced": true,
+                    "capture": null,
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 30,
+                    "cca_id": 22,
+                    "cma_log_id": 42
+                  },
+                  "evidence_dir": "evidence/run-3M33/",
+                  "assertions": [
+                    {
+                      "label": "strategy 3303 has a Confetti entry",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 30.0,
+                      "actual": 30.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 41.0,
+                      "actual": 41.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": 3.0,
+                      "actual": 3.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "apr cap",
+                      "status": "PASS",
+                      "expected": 0.3599,
+                      "actual": 0.3599,
+                      "passed": true
+                    },
+                    {
+                      "label": "code_to_mla maps 3303 to 3M33",
+                      "status": "PASS",
+                      "expected": "3M33",
+                      "actual": "3M33",
+                      "passed": true
+                    },
+                    {
+                      "label": "decision path strategy",
+                      "status": "PASS",
+                      "expected": "3303",
+                      "actual": "3303",
+                      "passed": true
+                    },
+                    {
+                      "label": "apr",
+                      "status": "PASS",
+                      "expected": 35.99,
+                      "actual": 35.99,
+                      "passed": true
+                    },
+                    {
+                      "label": "annual_membership_fee (year one)",
+                      "status": "PASS",
+                      "expected": 0.0,
+                      "actual": 0.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "year two fee, annual or monthly",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": [
+                        39.0,
+                        0.0
+                      ],
+                      "passed": true
+                    },
+                    {
+                      "label": "maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
+                      "status": "PASS",
+                      "expected": 35.0,
+                      "actual": 35.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 30.0,
+                      "actual": 30.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 41.0,
+                      "actual": 41.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": 3.0,
+                      "actual": 3.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "cma_pricing_strategy_identifier",
+                      "status": "PASS",
+                      "expected": "3M33",
+                      "actual": "3M33",
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 30.0,
+                      "actual": 30.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 41.0,
+                      "actual": 41.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": 3.0,
+                      "actual": 3.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late fee paragraph ($30/$41)",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "summary late fee ceiling, box introductory_annual_fee",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign transactions paragraph, new wording",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "ftf disclosure paragraph",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "summary ftf row, box introductory_annual_fee",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_structure",
+                      "status": "PASS",
+                      "expected": "1st: up to $30 | Subsequent: up to $41",
+                      "actual": "1st: up to $30 | Subsequent: up to $41",
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": "3% of each foreign transaction",
+                      "actual": "3% of each foreign transaction",
+                      "passed": true
+                    }
+                  ],
+                  "rpf": {
+                    "title": "RPF (orthogonal to the five)",
+                    "rows": [
+                      {
+                        "label": "Optimizely answered from a committed datafile snapshot (revision 1947), not a live pull - RPF is not verifiable on this stack (FINDINGS #36)",
+                        "status": "NO ANSWER",
+                        "expected": "$25",
+                        "actual": 0,
+                        "passed": false
+                      }
+                    ]
+                  },
+                  "attempt_id": "3M33-cma-1",
+                  "started_at": "2026-09-10T02:58:53+00:00"
+                }
+              ]
             },
             "predecisioned_terms": {
-              "status": "pending",
-              "attempts": []
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": "templateflow.boston.k8s.prd.app.avant.com",
+                    "template_version": "bd8382f5-fe63-409f-8d58-11104b01def5",
+                    "render_mode": "approved",
+                    "mla_forced": true,
+                    "capture": null,
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 30,
+                    "cca_id": 22,
+                    "cma_log_id": 42
+                  },
+                  "evidence_dir": "evidence/run-3M33/",
+                  "assertions": [
+                    {
+                      "label": "decision path strategy",
+                      "status": "PASS",
+                      "expected": "3303",
+                      "actual": "3303",
+                      "passed": true
+                    },
+                    {
+                      "label": "apr",
+                      "status": "PASS",
+                      "expected": 35.99,
+                      "actual": 35.99,
+                      "passed": true
+                    },
+                    {
+                      "label": "annual_membership_fee (year one)",
+                      "status": "PASS",
+                      "expected": 0.0,
+                      "actual": 0.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "year two fee, annual or monthly",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": [
+                        39.0,
+                        0.0
+                      ],
+                      "passed": true
+                    },
+                    {
+                      "label": "maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
+                      "status": "PASS",
+                      "expected": 35.0,
+                      "actual": 35.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 30.0,
+                      "actual": 30.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 41.0,
+                      "actual": 41.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": 3.0,
+                      "actual": 3.0,
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "3M33-predecisioned_terms-1",
+                  "started_at": "2026-09-10T02:58:53+00:00"
+                }
+              ]
             },
             "schumer_box_basic": {
-              "status": "pending",
+              "status": "not_applicable",
               "attempts": []
             },
             "schumer_box_apply": {
-              "status": "pending",
+              "status": "not_applicable",
               "attempts": []
             },
             "schumer_box_landing": {
-              "status": "pending",
+              "status": "not_applicable",
               "attempts": []
             }
           }
@@ -1314,24 +2558,353 @@
           },
           "surfaces": {
             "cma": {
-              "status": "pending",
-              "attempts": []
+              "status": "failed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": "templateflow.boston.k8s.prd.app.avant.com",
+                    "template_version": "bd8382f5-fe63-409f-8d58-11104b01def5",
+                    "render_mode": "approved",
+                    "mla_forced": false,
+                    "capture": null,
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 35,
+                    "cca_id": 26,
+                    "cma_log_id": 50
+                  },
+                  "evidence_dir": "evidence/run-3219/",
+                  "assertions": [
+                    {
+                      "label": "strategy 3219 has a Confetti entry",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "apr cap",
+                      "status": "PASS",
+                      "expected": 0.3599,
+                      "actual": 0.3599,
+                      "passed": true
+                    },
+                    {
+                      "label": "param_to_id resolves the uuid to 3219",
+                      "status": "PASS",
+                      "expected": "3219",
+                      "actual": "3219",
+                      "passed": true
+                    },
+                    {
+                      "label": "decision path strategy",
+                      "status": "PASS",
+                      "expected": "3219",
+                      "actual": "3219",
+                      "passed": true
+                    },
+                    {
+                      "label": "apr",
+                      "status": "PASS",
+                      "expected": 35.99,
+                      "actual": 35.99,
+                      "passed": true
+                    },
+                    {
+                      "label": "annual_membership_fee (year one)",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": 39.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "year two fee, annual or monthly",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": [
+                        39.0,
+                        0.0
+                      ],
+                      "passed": true
+                    },
+                    {
+                      "label": "maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
+                      "status": "PASS",
+                      "expected": 35.0,
+                      "actual": 35.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "cma_pricing_strategy_identifier",
+                      "status": "PASS",
+                      "expected": "3219",
+                      "actual": "3219",
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 28.0,
+                      "actual": 28.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": 39.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "late fee paragraph ($28/$39)",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "summary late fee ceiling, box all_other",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign transactions paragraph, old wording",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "summary row: ftf cell None, cash advance sentence intact",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "ftf disclosure absent - proven by assert_cma_absence.py, not here",
+                      "status": "NOT CAPTURED",
+                      "expected": "-",
+                      "actual": null,
+                      "passed": false
+                    },
+                    {
+                      "label": "late_fee_structure",
+                      "status": "PASS",
+                      "expected": "1st: up to $28 | Subsequent: up to $39",
+                      "actual": "1st: up to $28 | Subsequent: up to $39",
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    }
+                  ],
+                  "rpf": {
+                    "title": "RPF (orthogonal to the five)",
+                    "rows": [
+                      {
+                        "label": "Optimizely answered from a committed datafile snapshot (revision 1947), not a live pull - RPF is not verifiable on this stack (FINDINGS #36)",
+                        "status": "NO ANSWER",
+                        "expected": "$25",
+                        "actual": 0,
+                        "passed": false
+                      }
+                    ]
+                  },
+                  "attempt_id": "3219-cma-1",
+                  "started_at": "2026-09-10T03:03:28+00:00"
+                }
+              ]
             },
             "predecisioned_terms": {
-              "status": "pending",
-              "attempts": []
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": "templateflow.boston.k8s.prd.app.avant.com",
+                    "template_version": "bd8382f5-fe63-409f-8d58-11104b01def5",
+                    "render_mode": "approved",
+                    "mla_forced": false,
+                    "capture": null,
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 35,
+                    "cca_id": 26,
+                    "cma_log_id": 50
+                  },
+                  "evidence_dir": "evidence/run-3219/",
+                  "assertions": [
+                    {
+                      "label": "decision path strategy",
+                      "status": "PASS",
+                      "expected": "3219",
+                      "actual": "3219",
+                      "passed": true
+                    },
+                    {
+                      "label": "apr",
+                      "status": "PASS",
+                      "expected": 35.99,
+                      "actual": 35.99,
+                      "passed": true
+                    },
+                    {
+                      "label": "annual_membership_fee (year one)",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": 39.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "year two fee, annual or monthly",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": [
+                        39.0,
+                        0.0
+                      ],
+                      "passed": true
+                    },
+                    {
+                      "label": "maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
+                      "status": "PASS",
+                      "expected": 35.0,
+                      "actual": 35.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "3219-predecisioned_terms-1",
+                  "started_at": "2026-09-10T03:03:28+00:00"
+                }
+              ]
             },
             "schumer_box_basic": {
-              "status": "pending",
-              "attempts": []
+              "status": "blocked",
+              "attempts": [],
+              "blocked_on": [
+                "dev-mp-only, see FINDINGS #35"
+              ]
             },
             "schumer_box_apply": {
-              "status": "pending",
-              "attempts": []
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": null,
+                    "template_version": null,
+                    "render_mode": null,
+                    "mla_forced": false,
+                    "capture": "/Users/nicoga30/Source/avant/frontbook-fee-validation/evidence/run-3219/schumer_account_opening_3219.html",
+                    "control": "/Users/nicoga30/Source/avant/frontbook-fee-validation/evidence/run-3220/schumer_account_opening_3220.html"
+                  },
+                  "handles": {
+                    "application_id": 35,
+                    "cca_id": 26,
+                    "cma_log_id": 50
+                  },
+                  "evidence_dir": "evidence/run-3219/",
+                  "assertions": [
+                    {
+                      "label": "schumer_box_apply value table (assert_schumer_box.py)",
+                      "status": "PASS",
+                      "expected": "ALL PASS",
+                      "actual": "ALL PASS",
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "3219-schumer_box_apply-1",
+                  "started_at": "2026-09-10T03:03:28+00:00"
+                }
+              ]
             },
             "schumer_box_landing": {
-              "status": "pending",
-              "attempts": []
+              "status": "blocked",
+              "attempts": [],
+              "blocked_on": [
+                "CSRV-5845",
+                "CSRV-5846"
+              ]
             }
           }
         },
@@ -1350,24 +2923,353 @@
           },
           "surfaces": {
             "cma": {
-              "status": "pending",
-              "attempts": []
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": "templateflow.boston.k8s.prd.app.avant.com",
+                    "template_version": "bd8382f5-fe63-409f-8d58-11104b01def5",
+                    "render_mode": "approved",
+                    "mla_forced": false,
+                    "capture": null,
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 33,
+                    "cca_id": 25,
+                    "cma_log_id": 46
+                  },
+                  "evidence_dir": "evidence/run-3220/",
+                  "assertions": [
+                    {
+                      "label": "strategy 3220 has a Confetti entry",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 30.0,
+                      "actual": 30.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 41.0,
+                      "actual": 41.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": 3.0,
+                      "actual": 3.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "apr cap",
+                      "status": "PASS",
+                      "expected": 0.3599,
+                      "actual": 0.3599,
+                      "passed": true
+                    },
+                    {
+                      "label": "param_to_id resolves the uuid to 3220",
+                      "status": "PASS",
+                      "expected": "3220",
+                      "actual": "3220",
+                      "passed": true
+                    },
+                    {
+                      "label": "decision path strategy",
+                      "status": "PASS",
+                      "expected": "3220",
+                      "actual": "3220",
+                      "passed": true
+                    },
+                    {
+                      "label": "apr",
+                      "status": "PASS",
+                      "expected": 35.99,
+                      "actual": 35.99,
+                      "passed": true
+                    },
+                    {
+                      "label": "annual_membership_fee (year one)",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": 39.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "year two fee, annual or monthly",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": [
+                        39.0,
+                        0.0
+                      ],
+                      "passed": true
+                    },
+                    {
+                      "label": "maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
+                      "status": "PASS",
+                      "expected": 35.0,
+                      "actual": 35.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 30.0,
+                      "actual": 30.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 41.0,
+                      "actual": 41.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": 3.0,
+                      "actual": 3.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "cma_pricing_strategy_identifier",
+                      "status": "PASS",
+                      "expected": "3220",
+                      "actual": "3220",
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 30.0,
+                      "actual": 30.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 41.0,
+                      "actual": 41.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": 3.0,
+                      "actual": 3.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late fee paragraph ($30/$41)",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "summary late fee ceiling, box all_other",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign transactions paragraph, new wording",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "ftf disclosure paragraph",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "summary ftf row, box all_other",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_structure",
+                      "status": "PASS",
+                      "expected": "1st: up to $30 | Subsequent: up to $41",
+                      "actual": "1st: up to $30 | Subsequent: up to $41",
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": "3% of each foreign transaction",
+                      "actual": "3% of each foreign transaction",
+                      "passed": true
+                    }
+                  ],
+                  "rpf": {
+                    "title": "RPF (orthogonal to the five)",
+                    "rows": [
+                      {
+                        "label": "Optimizely answered from a committed datafile snapshot (revision 1947), not a live pull - RPF is not verifiable on this stack (FINDINGS #36)",
+                        "status": "NO ANSWER",
+                        "expected": "$25",
+                        "actual": 0,
+                        "passed": false
+                      }
+                    ]
+                  },
+                  "attempt_id": "3220-cma-1",
+                  "started_at": "2026-09-10T03:02:02+00:00"
+                }
+              ]
             },
             "predecisioned_terms": {
-              "status": "pending",
-              "attempts": []
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": "templateflow.boston.k8s.prd.app.avant.com",
+                    "template_version": "bd8382f5-fe63-409f-8d58-11104b01def5",
+                    "render_mode": "approved",
+                    "mla_forced": false,
+                    "capture": null,
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 33,
+                    "cca_id": 25,
+                    "cma_log_id": 46
+                  },
+                  "evidence_dir": "evidence/run-3220/",
+                  "assertions": [
+                    {
+                      "label": "decision path strategy",
+                      "status": "PASS",
+                      "expected": "3220",
+                      "actual": "3220",
+                      "passed": true
+                    },
+                    {
+                      "label": "apr",
+                      "status": "PASS",
+                      "expected": 35.99,
+                      "actual": 35.99,
+                      "passed": true
+                    },
+                    {
+                      "label": "annual_membership_fee (year one)",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": 39.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "year two fee, annual or monthly",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": [
+                        39.0,
+                        0.0
+                      ],
+                      "passed": true
+                    },
+                    {
+                      "label": "maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
+                      "status": "PASS",
+                      "expected": 35.0,
+                      "actual": 35.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 30.0,
+                      "actual": 30.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 41.0,
+                      "actual": 41.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": 3.0,
+                      "actual": 3.0,
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "3220-predecisioned_terms-1",
+                  "started_at": "2026-09-10T03:02:02+00:00"
+                }
+              ]
             },
             "schumer_box_basic": {
-              "status": "pending",
-              "attempts": []
+              "status": "blocked",
+              "attempts": [],
+              "blocked_on": [
+                "dev-mp-only, see FINDINGS #35"
+              ]
             },
             "schumer_box_apply": {
-              "status": "pending",
-              "attempts": []
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": null,
+                    "template_version": null,
+                    "render_mode": null,
+                    "mla_forced": false,
+                    "capture": "/Users/nicoga30/Source/avant/frontbook-fee-validation/evidence/run-3220/schumer_account_opening_3220.html",
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 33,
+                    "cca_id": 25,
+                    "cma_log_id": 46
+                  },
+                  "evidence_dir": "evidence/run-3220/",
+                  "assertions": [
+                    {
+                      "label": "schumer_box_apply value table (assert_schumer_box.py)",
+                      "status": "PASS",
+                      "expected": "ALL PASS",
+                      "actual": "ALL PASS",
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "3220-schumer_box_apply-1",
+                  "started_at": "2026-09-10T03:02:02+00:00"
+                }
+              ]
             },
             "schumer_box_landing": {
-              "status": "pending",
-              "attempts": []
+              "status": "blocked",
+              "attempts": [],
+              "blocked_on": [
+                "CSRV-5845",
+                "CSRV-5846"
+              ]
             }
           }
         }
@@ -1392,23 +3294,316 @@
           },
           "surfaces": {
             "cma": {
-              "status": "pending",
-              "attempts": []
+              "status": "failed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": "templateflow.boston.k8s.prd.app.avant.com",
+                    "template_version": "bd8382f5-fe63-409f-8d58-11104b01def5",
+                    "render_mode": "approved",
+                    "mla_forced": true,
+                    "capture": null,
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 34,
+                    "cca_id": 27,
+                    "cma_log_id": 52
+                  },
+                  "evidence_dir": "evidence/run-3M89/",
+                  "assertions": [
+                    {
+                      "label": "strategy 3219 has a Confetti entry",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "apr cap",
+                      "status": "PASS",
+                      "expected": 0.3599,
+                      "actual": 0.3599,
+                      "passed": true
+                    },
+                    {
+                      "label": "code_to_mla maps 3219 to 3M89",
+                      "status": "PASS",
+                      "expected": "3M89",
+                      "actual": "3M89",
+                      "passed": true
+                    },
+                    {
+                      "label": "decision path strategy",
+                      "status": "PASS",
+                      "expected": "3219",
+                      "actual": "3219",
+                      "passed": true
+                    },
+                    {
+                      "label": "apr",
+                      "status": "PASS",
+                      "expected": 35.99,
+                      "actual": 35.99,
+                      "passed": true
+                    },
+                    {
+                      "label": "annual_membership_fee (year one)",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": 39.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "year two fee, annual or monthly",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": [
+                        39.0,
+                        0.0
+                      ],
+                      "passed": true
+                    },
+                    {
+                      "label": "maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
+                      "status": "PASS",
+                      "expected": 35.0,
+                      "actual": 35.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "cma_pricing_strategy_identifier",
+                      "status": "PASS",
+                      "expected": "3M89",
+                      "actual": "3M89",
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 28.0,
+                      "actual": 28.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": 39.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "late fee paragraph ($28/$39)",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "summary late fee ceiling, box all_other",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign transactions paragraph, old wording",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "summary row: ftf cell None, cash advance sentence intact",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "ftf disclosure absent - proven by assert_cma_absence.py, not here",
+                      "status": "NOT CAPTURED",
+                      "expected": "-",
+                      "actual": null,
+                      "passed": false
+                    },
+                    {
+                      "label": "late_fee_structure",
+                      "status": "PASS",
+                      "expected": "1st: up to $28 | Subsequent: up to $39",
+                      "actual": "1st: up to $28 | Subsequent: up to $39",
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    }
+                  ],
+                  "rpf": {
+                    "title": "RPF (orthogonal to the five)",
+                    "rows": [
+                      {
+                        "label": "Optimizely answered from a committed datafile snapshot (revision 1947), not a live pull - RPF is not verifiable on this stack (FINDINGS #36)",
+                        "status": "NO ANSWER",
+                        "expected": "$25",
+                        "actual": 0,
+                        "passed": false
+                      }
+                    ]
+                  },
+                  "attempt_id": "3M89-cma-1",
+                  "started_at": "2026-09-10T03:03:28+00:00"
+                }
+              ]
             },
             "predecisioned_terms": {
-              "status": "pending",
-              "attempts": []
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": "templateflow.boston.k8s.prd.app.avant.com",
+                    "template_version": "bd8382f5-fe63-409f-8d58-11104b01def5",
+                    "render_mode": "approved",
+                    "mla_forced": true,
+                    "capture": null,
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 34,
+                    "cca_id": 27,
+                    "cma_log_id": 52
+                  },
+                  "evidence_dir": "evidence/run-3M89/",
+                  "assertions": [
+                    {
+                      "label": "decision path strategy",
+                      "status": "PASS",
+                      "expected": "3219",
+                      "actual": "3219",
+                      "passed": true
+                    },
+                    {
+                      "label": "apr",
+                      "status": "PASS",
+                      "expected": 35.99,
+                      "actual": 35.99,
+                      "passed": true
+                    },
+                    {
+                      "label": "annual_membership_fee (year one)",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": 39.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "year two fee, annual or monthly",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": [
+                        39.0,
+                        0.0
+                      ],
+                      "passed": true
+                    },
+                    {
+                      "label": "maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
+                      "status": "PASS",
+                      "expected": 35.0,
+                      "actual": 35.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": null,
+                      "actual": null,
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "3M89-predecisioned_terms-1",
+                  "started_at": "2026-09-10T03:03:28+00:00"
+                }
+              ]
             },
             "schumer_box_basic": {
-              "status": "pending",
+              "status": "not_applicable",
               "attempts": []
             },
             "schumer_box_apply": {
-              "status": "pending",
+              "status": "not_applicable",
               "attempts": []
             },
             "schumer_box_landing": {
-              "status": "pending",
+              "status": "not_applicable",
               "attempts": []
             }
           }
@@ -1428,23 +3623,316 @@
           },
           "surfaces": {
             "cma": {
-              "status": "pending",
-              "attempts": []
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": "templateflow.boston.k8s.prd.app.avant.com",
+                    "template_version": "bd8382f5-fe63-409f-8d58-11104b01def5",
+                    "render_mode": "approved",
+                    "mla_forced": true,
+                    "capture": null,
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 32,
+                    "cca_id": 24,
+                    "cma_log_id": 48
+                  },
+                  "evidence_dir": "evidence/run-3M90/",
+                  "assertions": [
+                    {
+                      "label": "strategy 3220 has a Confetti entry",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 30.0,
+                      "actual": 30.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 41.0,
+                      "actual": 41.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": 3.0,
+                      "actual": 3.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "apr cap",
+                      "status": "PASS",
+                      "expected": 0.3599,
+                      "actual": 0.3599,
+                      "passed": true
+                    },
+                    {
+                      "label": "code_to_mla maps 3220 to 3M90",
+                      "status": "PASS",
+                      "expected": "3M90",
+                      "actual": "3M90",
+                      "passed": true
+                    },
+                    {
+                      "label": "decision path strategy",
+                      "status": "PASS",
+                      "expected": "3220",
+                      "actual": "3220",
+                      "passed": true
+                    },
+                    {
+                      "label": "apr",
+                      "status": "PASS",
+                      "expected": 35.99,
+                      "actual": 35.99,
+                      "passed": true
+                    },
+                    {
+                      "label": "annual_membership_fee (year one)",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": 39.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "year two fee, annual or monthly",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": [
+                        39.0,
+                        0.0
+                      ],
+                      "passed": true
+                    },
+                    {
+                      "label": "maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
+                      "status": "PASS",
+                      "expected": 35.0,
+                      "actual": 35.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 30.0,
+                      "actual": 30.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 41.0,
+                      "actual": 41.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": 3.0,
+                      "actual": 3.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "cma_pricing_strategy_identifier",
+                      "status": "PASS",
+                      "expected": "3M90",
+                      "actual": "3M90",
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 30.0,
+                      "actual": 30.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 41.0,
+                      "actual": 41.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": 3.0,
+                      "actual": 3.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late fee paragraph ($30/$41)",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "summary late fee ceiling, box all_other",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign transactions paragraph, new wording",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "ftf disclosure paragraph",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "summary ftf row, box all_other",
+                      "status": "PASS",
+                      "expected": true,
+                      "actual": true,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_structure",
+                      "status": "PASS",
+                      "expected": "1st: up to $30 | Subsequent: up to $41",
+                      "actual": "1st: up to $30 | Subsequent: up to $41",
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": "3% of each foreign transaction",
+                      "actual": "3% of each foreign transaction",
+                      "passed": true
+                    }
+                  ],
+                  "rpf": {
+                    "title": "RPF (orthogonal to the five)",
+                    "rows": [
+                      {
+                        "label": "Optimizely answered from a committed datafile snapshot (revision 1947), not a live pull - RPF is not verifiable on this stack (FINDINGS #36)",
+                        "status": "NO ANSWER",
+                        "expected": "$25",
+                        "actual": 0,
+                        "passed": false
+                      }
+                    ]
+                  },
+                  "attempt_id": "3M90-cma-1",
+                  "started_at": "2026-09-10T03:02:02+00:00"
+                }
+              ]
             },
             "predecisioned_terms": {
-              "status": "pending",
-              "attempts": []
+              "status": "passed",
+              "attempts": [
+                {
+                  "stage": "asserted",
+                  "provenance": {
+                    "templateflow_host": "templateflow.boston.k8s.prd.app.avant.com",
+                    "template_version": "bd8382f5-fe63-409f-8d58-11104b01def5",
+                    "render_mode": "approved",
+                    "mla_forced": true,
+                    "capture": null,
+                    "control": null
+                  },
+                  "handles": {
+                    "application_id": 32,
+                    "cca_id": 24,
+                    "cma_log_id": 48
+                  },
+                  "evidence_dir": "evidence/run-3M90/",
+                  "assertions": [
+                    {
+                      "label": "decision path strategy",
+                      "status": "PASS",
+                      "expected": "3220",
+                      "actual": "3220",
+                      "passed": true
+                    },
+                    {
+                      "label": "apr",
+                      "status": "PASS",
+                      "expected": 35.99,
+                      "actual": 35.99,
+                      "passed": true
+                    },
+                    {
+                      "label": "annual_membership_fee (year one)",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": 39.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "year two fee, annual or monthly",
+                      "status": "PASS",
+                      "expected": 39.0,
+                      "actual": [
+                        39.0,
+                        0.0
+                      ],
+                      "passed": true
+                    },
+                    {
+                      "label": "maximum_late_fee is the policy constant, not the schedule (FINDINGS #34)",
+                      "status": "PASS",
+                      "expected": 35.0,
+                      "actual": 35.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_initial",
+                      "status": "PASS",
+                      "expected": 30.0,
+                      "actual": 30.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "late_fee_subsequent",
+                      "status": "PASS",
+                      "expected": 41.0,
+                      "actual": 41.0,
+                      "passed": true
+                    },
+                    {
+                      "label": "foreign_transaction_fee",
+                      "status": "PASS",
+                      "expected": 3.0,
+                      "actual": 3.0,
+                      "passed": true
+                    }
+                  ],
+                  "attempt_id": "3M90-predecisioned_terms-1",
+                  "started_at": "2026-09-10T03:02:02+00:00"
+                }
+              ]
             },
             "schumer_box_basic": {
-              "status": "pending",
+              "status": "not_applicable",
               "attempts": []
             },
             "schumer_box_apply": {
-              "status": "pending",
+              "status": "not_applicable",
               "attempts": []
             },
             "schumer_box_landing": {
-              "status": "pending",
+              "status": "not_applicable",
               "attempts": []
             }
           }

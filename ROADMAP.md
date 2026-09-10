@@ -570,10 +570,26 @@ to support.
 
 ### 2.4 Concurrency
 
-- [ ] Pipeline: bounded browser stage, wide console and assertion stages
-- [ ] Measured that concurrency 2 actually beats 1 on this hardware before raising it
-- [ ] `--concurrency 1` works as a clean-reproduction fallback
-- [ ] A halted Run does not stall the others
+- Not built as a stage-split pipeline: struck the original "bounded browser stage, wide console
+  and assertion stages" plan in favor of a coarser, simpler unit - see below.
+- [x] Concurrency unit is the **Pair** (`scripts/run_campaign.py`), not a browser/console/assertion
+      stage split - each Pair's frontbook-then-backbook codes run sequentially in one worker
+      (preserving `schumer_box_apply`'s real frontbook-before-backbook dependency), and
+      `--concurrency N` bounds how many Pairs' workers run at once via a `ThreadPoolExecutor`. This
+      also bounds concurrent browser instances at N directly, without a separate stage pool -
+      simpler than the originally-planned split and sufficient for the measurement below.
+- [x] Measured that concurrency 2 actually beats 1 on this hardware before raising it - two
+      comparable batches (2 Pairs / 4 codes each, all `direct`, ~84-90s per code): concurrency 1 =
+      342s wall (090+084+084+084s, fully sequential); concurrency 2 = 173s wall (both Pairs
+      overlapping) - essentially 2x, negligible contention overhead. Verified 2026-09-10 on
+      3303/3302 + 3M33/3M32 (c1) vs 3220/3219 + 3M90/3M89 (c2).
+- [x] `--concurrency 1` works as a clean-reproduction fallback - the baseline run above submitted
+      lanes in the same relative order as the pre-concurrency flat schedule and a single worker
+      drained them one at a time, byte-for-byte the old sequential behavior (342s = exact sum of
+      the 4 codes' individual times, zero overlap)
+- [x] A halted Run does not stall the others - both concurrency-2 backbook codes (3219, 3M89) hit
+      the known pre-existing FTF-absence Assertion Failure (rule 2, not a bug) mid-run; neither
+      blocked its own Pair-mate's lane or the other Pair's lane, which finished independently
 
 ### 2.5 The artifact
 
