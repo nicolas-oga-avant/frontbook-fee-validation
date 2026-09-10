@@ -8,6 +8,9 @@ runs/
 # not source.
 report/
 
+# manifest.py record()'s lock file - empty, exists only to flock(), not content.
+data/manifest.json.lock
+
 # Local scratch
 .DS_Store
 __pycache__/

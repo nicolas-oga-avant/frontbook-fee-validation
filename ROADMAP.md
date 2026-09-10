@@ -601,11 +601,28 @@ to support.
       (5217/5216, 7213/7212, 7105/7104, 9004/9003), concurrency 4 = 235s wall - matching a
       single lane's own solo duration (~235-236s) almost exactly, i.e. all four lanes ran with
       no measurable queuing at the shared Puma workers. Clear win over concurrency 2 (~470s
-      projected for the same 8-code batch, two sequential rounds) and no new flakiness - the 4
-      FAILs are the same known pre-existing backbook FTF-absence gap (rule 2), not a
-      concurrency artifact. Per-code time rose from ~84-90s to ~111-124s here vs the c1/c2
+      projected for the same 8-code batch, two sequential rounds); wall-clock timing and exit
+      codes showed no problem. Per-code time rose from ~84-90s to ~111-124s here vs the c1/c2
       measurement above - that is `schumer_box_landing`'s new real capture+assert step landing
       in between the two measurements, not a concurrency regression.
+  - **Correction, found minutes later, same session:** timing and exit codes were not enough -
+    5 of the 8 codes had silently lost real, already-computed results in `data/manifest.json`
+    (`5217`/`7213`/`7104` lost `cma`/`predecisioned_terms`/`schumer_box_apply`; `7212`/`9004`
+    lost `schumer_box_landing`), because `manifest.py record()`'s load-modify-save had no
+    locking - concurrent subprocesses clobbered each other's saves outright, not just the one
+    cell each was writing. Exactly the silent failure AGENTS.md's central rule warns about,
+    just in this script's own file I/O. Fixed with an exclusive flock (`_locked()`, a sidecar
+    `data/manifest.json.lock` rather than locking `MANIFEST` itself, since `_save()` rewrites
+    the file wholesale each time and a second process could otherwise lock a different inode
+    than the first is holding). Verified with 60 concurrent threads and, separately, 40 real
+    concurrent OS subprocesses against a scratch copy - zero losses either way, where the
+    unfixed version had already shown losses on real data. The 5 affected codes were
+    re-verified for real afterward, not just backfilled from the old attempt: 3 got a full
+    re-run (`cma`/`predecisioned_terms`/`schumer_box_apply` all recomputed from scratch, one
+    the known pre-existing backbook FTF-absence gap - not new), 2 used the cheap
+    `--check-schumer-landing` backfill. Every currently-attempted code re-checked afterward for
+    the same lost-write signature (a real status alongside an inexplicable `pending`) - none
+    found.
 - [x] `--concurrency 1` works as a clean-reproduction fallback - the baseline run above submitted
       lanes in the same relative order as the pre-concurrency flat schedule and a single worker
       drained them one at a time, byte-for-byte the old sequential behavior (342s = exact sum of

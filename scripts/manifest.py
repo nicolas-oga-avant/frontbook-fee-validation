@@ -26,7 +26,9 @@ rule (AGENTS.md rule 1 by another name) cannot be violated by a slipped edit.
 """
 
 import argparse
+import contextlib
 import csv
+import fcntl
 import hashlib
 import json
 import pathlib
@@ -35,6 +37,34 @@ from datetime import datetime, timezone
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MATRIX = ROOT / "data" / "run-matrix.csv"
 MANIFEST = ROOT / "data" / "manifest.json"
+_LOCK_PATH = ROOT / "data" / "manifest.json.lock"
+
+
+@contextlib.contextmanager
+def _locked():
+    """Exclusive lock held across one whole load-modify-save cycle in record() below.
+
+    ROADMAP 2.4's concurrency made this a real bug, not a theoretical one: confirmed 2026-09-10
+    that concurrent run_validation.py subprocesses calling record() around the same moment
+    silently lose each other's writes (a plain read-modify-write with no locking - the last
+    save wins, wholesale, not just on the one cell each call meant to touch). 5 of 8 codes in a
+    concurrency-4 batch lost already-computed, already-verified results this way - the browser
+    walk succeeded, evidence sits on disk, and the Manifest still says `pending`. Exactly the
+    silent failure AGENTS.md's central rule warns about, just aimed at this script's own file
+    I/O instead of the platform.
+
+    A sidecar lock file, not a lock on MANIFEST itself: flock is advisory and tied to the
+    open file description, and MANIFEST gets fully rewritten (not edited in place) on every
+    save, which would let a second process re-open and re-lock a *different* inode than the one
+    the first process is holding.
+    """
+    _LOCK_PATH.touch(exist_ok=True)
+    with open(_LOCK_PATH, "r+") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(fh, fcntl.LOCK_UN)
 
 SURFACES = [
     "cma",
@@ -192,11 +222,6 @@ def record(code, surface, status, attempt_json=None, blocked_on=None):
             "attach. Drop --attempt-json, or pick a status that reflects an Attempt actually "
             "happening." % status)
 
-    doc = _load()
-    _check_seeded_from(doc)
-    run, pair, role = _find_run(doc, code)
-    surf = run["surfaces"][surface]
-
     attempt = None
     if attempt_json is not None:
         attempt = json.loads(attempt_json)
@@ -214,18 +239,29 @@ def record(code, surface, status, attempt_json=None, blocked_on=None):
                 "derived value, or the attempt-json is describing something else than what "
                 "actually happened." % (status, derived))
 
-    surf["status"] = status
-    if blocked_on is not None:
-        surf["blocked_on"] = blocked_on
-    elif status != "blocked":
-        surf.pop("blocked_on", None)
+    # Locked from here through the save below: concurrent Runs (ROADMAP 2.4) call record() at
+    # overlapping times, and a load-modify-save with no lock lets one process's save silently
+    # discard another's - see _locked()'s own docstring for how this was actually caught.
+    with _locked():
+        doc = _load()
+        _check_seeded_from(doc)
+        run, pair, role = _find_run(doc, code)
+        surf = run["surfaces"][surface]
 
-    if attempt is not None:
-        attempt.setdefault("attempt_id", "%s-%s-%d" % (code, surface, len(surf["attempts"]) + 1))
-        attempt.setdefault("started_at", _now())
-        surf["attempts"].append(attempt)
+        surf["status"] = status
+        if blocked_on is not None:
+            surf["blocked_on"] = blocked_on
+        elif status != "blocked":
+            surf.pop("blocked_on", None)
 
-    _save(doc)
+        if attempt is not None:
+            attempt.setdefault("attempt_id",
+                                "%s-%s-%d" % (code, surface, len(surf["attempts"]) + 1))
+            attempt.setdefault("started_at", _now())
+            surf["attempts"].append(attempt)
+
+        _save(doc)
+
     print("%s / %s (%s) -> %s%s" % (
         pair["pair_id"], code, role, status,
         " [%s]" % ",".join(blocked_on) if blocked_on else ""))
