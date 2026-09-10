@@ -1,5 +1,5 @@
 {
-  "source": "/Users/ichigolas/Source/avant/.tickets/CSRV-5300/reference/redline-LGL-7960-schumer-box-and-cma.docx",
+  "source": "/Users/nicoga30/Source/avant/frontbook-fee-validation/reference/redline-LGL-7960-schumer-box-and-cma.docx",
   "assertions": [
     {
       "id": "summary_ftf_row-introductory_annual_fee",
@@ -45,6 +45,15 @@
       "old_codes_expect": "Late Fee. If you do not pay the Total Minimum Payment Due on your statement by the Payment Due Date, we will charge you a late fee. The fee may be up to ${late_fee_initial}, unless you incurred a late fee during the prior six billing periods. If you did, the fee may be up to ${late_fee_subsequent}. This fee will not exceed the amount permitted by law.",
       "old_codes_expect_source": "redline pre-change text",
       "new_codes_expect_literal": "Late Fee. If you do not pay the Total Minimum Payment Due on your statement by the Payment Due Date, we will charge you a late fee. The fee may be up to $30, unless you incurred a late fee during the prior six billing periods. If you did, the fee may be up to $41. This fee will not exceed the amount permitted by law."
+    },
+    {
+      "id": "rpf_disclosure_paragraph",
+      "kind": "rpf_disclosure_paragraph",
+      "summary_box": null,
+      "new_codes_expect": "Returned Payment Fee. A Returned Payment Fee may be charged if you make any payment that is not honored or returned for any reason. We may resubmit any returned payment up to two times. A returned payment fee may be charged even if your payment is honored on a subsequent submission. The fee may be up to $25. This fee will not exceed the amount permitted by law.",
+      "old_codes_expect": "Returned Payment Fee. A Returned Payment Fee may be charged if you make any payment that is not honored or returned for any reason. We may resubmit any returned payment up to two times. A returned payment fee may be charged even if your payment is honored on a subsequent submission. The fee may be up to $25. This fee will not exceed the amount permitted by law.",
+      "old_codes_expect_source": "unedited by this redline - identical on both sides",
+      "new_codes_expect_literal": "Returned Payment Fee. A Returned Payment Fee may be charged if you make any payment that is not honored or returned for any reason. We may resubmit any returned payment up to two times. A returned payment fee may be charged even if your payment is honored on a subsequent submission. The fee may be up to $25. This fee will not exceed the amount permitted by law."
     },
     {
       "id": "ftf_disclosure_paragraph",

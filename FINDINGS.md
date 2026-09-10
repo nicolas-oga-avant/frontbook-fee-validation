@@ -1240,32 +1240,57 @@ have shown as a generic halted `SubmitFailed` before the fix); that's fine now t
 limit is gone, but worth remembering if `MAXIMUM_ALLOWED_PER_DAY_FROM_SAME_IP` is ever exceeded
 some *other* way this bypass doesn't cover.
 
-## 40. The rendered CMA never discloses the Returned Payment Fee - every code, not launch-related
+## 40. The rendered CMA never discloses the Returned Payment Fee - a wiring gap, not a business rule
 
-**Symptom, spotted by inspecting the report (not by an automated check - nothing in this repo
-asserts this).** The three standalone Schumer surfaces (`schumer_box_apply`,
-`schumer_box_basic`, `schumer_box_landing`) all disclose `Returned Payment Fee ... Up to $25` for
-every code, matching `data/run-matrix.csv`'s `expected_rpf` column (`$25`, uniform across all 28
-rows). The rendered cardmember agreement itself never mentions "returned payment" anywhere in the
-document, not just in its own embedded fee-summary table - confirmed by a case-insensitive search
-of the full rendered HTML, not just the box.
+**Symptom, spotted by inspecting the report (nothing in this repo asserted it until this was
+found).** The three standalone Schumer surfaces (`schumer_box_apply`, `schumer_box_basic`,
+`schumer_box_landing`) all disclose `Returned Payment Fee ... Up to $25` for every code. The
+rendered cardmember agreement never mentions "returned payment" anywhere - confirmed on `0120`,
+`0122`, `3M33`, `7104`, `9004` (both roles, direct and MLA) and now asserted on every Run
+(`assert_value_table.py`'s `rendered_point`, added 2026-09-10).
 
-**Not code-specific and not launch-specific.** Checked four renders spanning both roles and MLA:
-`0120`, `0122`, `3M33`, `7104`, `9004` - zero occurrences in every one. The CMA's own summary
-table lists exactly two Penalty Fees rows, `Late Fee` and `Overlimit Fee`; `Returned Payment Fee`
-is absent from the row list entirely, not merely blank. Since RPF is unrelated to CSRV-4119 (the
-redline changes only touch late fee and the foreign transaction fee - FINDINGS #10's own
-docstring), this is not a fee-launch regression; it looks like a pre-existing fact about the CMA
-template, present before this campaign and orthogonal to it, the same way FINDINGS #36 already
-treats RPF as "orthogonal to the five" assertion points.
+**Corrected twice while investigating - both earlier theories were wrong, in order:**
 
-**Not asserted anywhere in this repo, and not fixed here (hard rule 2).** `assert_value_table.py`'s
-RPF point (FINDINGS #36) checks the Optimizely-sourced dollar amount, never whether the CMA
-document's own text discloses it. `assert_schumer_box.py`/`assert_cma_absence.py`'s redline
-sentences (`data/redline-assertions.json`) have no RPF entry at all - it was never part of what
-either checker looks for, on any surface. So this is a genuine coverage gap (RPF's textual
-presence in the CMA was never checked, one way or the other) layered under a genuine cross-surface
-content question (four surfaces describing the same product, one of them silent on a fee the
-other three charge) - which one is the source of truth, or whether the CMA discloses it elsewhere
-under different wording, is a question for whoever owns the CMA template/compliance content, not
-something to resolve by pattern-matching a different phrase and calling it found.
+1. First theory: "unrelated to the launch, a pre-existing fact about the CMA." Wrong - the
+   approved redline (the Google Doc linked from the epic, not just the `reference/` docx) shows
+   the Returned Payment Fee paragraph and summary row sitting directly between the Late Fee and
+   Foreign Transaction Fee paragraphs this redline DOES edit. It carries no tracked changes
+   (`extract_redline_assertions.py` correctly excluded it - the tool's job is asserting deltas),
+   but "unedited" is not the same as "unrelated": it was always supposed to render.
+2. Second theory: an Optimizely audience/eligibility gate (`card_rpf_fees`, `can_assess_rpf_fees`
+   - FINDINGS #36's mechanism), with the local snapshot datafile simply not including these 28
+   codes (confirmed: the live Optimizely audience "RPF/NSF Eligible Card Accounts", queried via
+   MCP, DOES include all 28 - last modified 2026-09-09 - while the committed local snapshot
+   includes none of them). Also wrong for the CMA specifically, confirmed by grepping
+   `cma_input_helper.rb` / `cardmember_agreement_inputs.rb`: neither references RPF, Optimizely,
+   or `rpf_fee_eligible?` at all.
+
+**Actual root cause, confirmed by direct evidence, not inference:**
+
+- Queried TemplateFlow's live API (`TemplateflowEngine::Client.get_template_details`, via `bin/
+  rails runner` inside the `basic` container) for the CMA template's currently-approved version
+  (`bd8382f5-fe63-409f-8d58-11104b01def5`, the exact version every render in this campaign
+  actually used - `render_mode: "approved"`, confirmed identical across two separate renders of
+  `0122`, so not a caching artifact either). Its variable list includes `card_rpf_eligible` and
+  `card_rpf_maximum_fee_amount` - the template has a Liquid gate for this content.
+- Those exact two variable names are computed in exactly one place in `avant-basic`:
+  `lib/avant/email/data_renderer.rb:164-172` (`Avant::Email::DataRenderer`, the
+  servicing-email/notice renderer) - `card_rpf_eligible: calc: proc { product.rpf_fee_eligible? }`.
+- The CMA/letter rendering path is a different pipeline entirely:
+  `lib/avant/servicing_v2/communications/cardmember_agreement_letter.rb`'s
+  `templateflow_response` sends `data: cardmember_agreement_log.template_variables` - populated
+  at log-creation time by the CMA input-assembly code (`cma_input_helper.rb`,
+  `cardmember_agreement_inputs.rb`), neither of which references RPF, `card_rpf_eligible`, or
+  `rpf_fee_eligible?` anywhere.
+
+So the template expects `card_rpf_eligible` to gate the paragraph, and the CMA-rendering code
+path never computes or supplies it - for any account, any pricing strategy, any environment. An
+undefined Liquid variable reads as falsy, so the gated paragraph is skipped. **This is not
+launch-specific, not code-specific, and not an Optimizely-eligibility business decision - it
+looks like a wiring gap between two independent rendering systems (servicing emails vs. the CMA
+letter) that both need the same eligibility flag, where only one of them was ever wired to
+compute it.** Not yet confirmed against the live Liquid template source itself (only its
+variable list), and not fixed here (hard rule 2, and well outside this repo's scope) - this
+belongs with whoever owns `cardmember_agreement_letter.rb` / `cma_input_helper.rb` and the CMA
+template, as a likely production defect affecting every issued card, not only this launch's 28
+codes.

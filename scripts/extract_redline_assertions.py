@@ -110,11 +110,25 @@ def classify(final):
         return "foreign_transactions_paragraph"
     if lowered.startswith("late fee."):
         return "late_fee_paragraph"
+    if lowered.startswith("returned payment fee."):
+        return "rpf_disclosure_paragraph"
     if "transaction in u.s. dollars" in lowered:
         return "summary_ftf_row"
     if lowered.startswith("up to"):
         return "summary_late_fee_ceiling"
     return "unclassified"
+
+
+# Some paragraphs carry no tracked changes at all - this redline does not edit them - but
+# still need asserting: the Returned Payment Fee paragraph sits directly between the Late
+# Fee and Foreign Transaction Fee paragraphs this redline DOES edit, and is entirely absent
+# from every rendered CMA in the campaign (FINDINGS #40, corrected 2026-09-10). An unedited
+# paragraph is normally the wrong thing to extract - see the final==original skip below -
+# but "unedited" here does not mean "irrelevant"; it is the strongest evidence that its
+# disappearance is accidental collateral damage from editing its neighbors, not a deliberate
+# content change nobody bothered to redline. old_codes_expect equals new_codes_expect for
+# these: the text does not vary between frontbook and backbook, unlike every other kind here.
+ALWAYS_CAPTURE_KINDS = {"rpf_disclosure_paragraph"}
 
 
 # The doc renders the Rate and Fee Summary twice, under these headings, because the
@@ -156,14 +170,18 @@ def extract(docx_path):
     assertions = []
     for paragraph in root.iter(W + "p"):
         final, original = paragraph_texts(paragraph)
-        if normalize(final) == normalize(original):
-            continue
         final, original = normalize(final), normalize(original)
+        unchanged = final == original
         kind = classify(final)
+        if unchanged and kind not in ALWAYS_CAPTURE_KINDS:
+            continue
 
         if kind in OLD_CODE_OVERRIDES:
             old_expect = OLD_CODE_OVERRIDES[kind]
             old_source = "template gating (not derivable from the redline)"
+        elif kind in ALWAYS_CAPTURE_KINDS:
+            old_expect = parameterize(original) or None
+            old_source = "unedited by this redline - identical on both sides"
         else:
             old_expect = parameterize(original) or None
             old_source = "redline pre-change text"

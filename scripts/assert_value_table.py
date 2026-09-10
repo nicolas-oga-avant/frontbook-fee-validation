@@ -239,6 +239,13 @@ def rendered_point(row, path):
                         late_fee_subsequent=late["late_fee_subsequent"]) in text),
         _check("foreign transactions paragraph, %s wording" % side, True,
                sentence("foreign_transactions_paragraph", side, **amounts) in text),
+        # Unlike the three above, this text does not vary by code or by side - the redline
+        # never edits it (FINDINGS #40, corrected 2026-09-10). Asserted on every Run,
+        # frontbook and backbook alike, for exactly that reason: a launch-caused regression
+        # (the neighboring late-fee/FTF edits accidentally deleting this paragraph) would
+        # show up identically everywhere, which is exactly the pattern actually observed.
+        _check("returned payment fee paragraph", True,
+               sentence("rpf_disclosure_paragraph", side) in text),
     ]
 
     if frontbook:
