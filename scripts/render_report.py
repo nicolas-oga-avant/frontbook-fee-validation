@@ -238,6 +238,15 @@ def render_evidence_embed(surface_name, code, attempt, report_code_dir):
         else:
             parts.append("<p>%s</p>" % esc(located["reason"] or MISSING))
 
+        # Backbook only: assert_cma_absence.py's own report, proving the launch content is
+        # genuinely absent (not just unchecked) against a frontbook control - see
+        # run_cma_absence() in run_validation.py.
+        absence_txt = os.path.join(EVIDENCE_ROOT, "run-%s" % code, "cma_absence_%s.txt" % code)
+        if os.path.exists(absence_txt):
+            with open(absence_txt) as fh:
+                parts.append("<h4>Absence check (assert_cma_absence.py)</h4><pre>%s</pre>"
+                             % esc(fh.read()))
+
     elif surface_name in ("schumer_box_apply", "schumer_box_landing"):
         capture_prefix = ("schumer_account_opening" if surface_name == "schumer_box_apply"
                           else "schumer_landing")

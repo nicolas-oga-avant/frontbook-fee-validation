@@ -310,6 +310,48 @@ def _assertion_row(label, passed, expected="ALL PASS", actual=None):
     }
 
 
+def _find_control_cma_html(sibling_code):
+    """The frontbook sibling's latest recorded cma render, by its handles.cma_log_id - never
+    the newest file in evidence/run-<sibling>/ (AGENTS.md hard rule 1). Returns the path, or
+    None if the sibling has no recorded cma Attempt (or its render is gone) - the caller must
+    still assert, honestly, without a control (assert_cma_absence.py's own "unproven" case)."""
+    doc = manifest_mod._load()
+    run, _, _ = manifest_mod._find_run(doc, sibling_code)
+    attempts = run["surfaces"]["cma"]["attempts"]
+    if not attempts:
+        return None
+    log_id = (attempts[-1].get("handles") or {}).get("cma_log_id")
+    if log_id is None:
+        return None
+    path = os.path.join(_ROOT, "evidence", "run-%s" % sibling_code,
+                        "cma_%s_log%s.html" % (sibling_code, log_id))
+    return path if os.path.exists(path) else None
+
+
+def run_cma_absence(code, row, backbook_html, evidence_dir):
+    """For a backbook code, prove the launch content is absent against a frontbook control -
+    assert_cma_absence.py's whole job, and the fix for the placeholder row
+    assert_value_table.py's own points() deliberately leaves NOT CAPTURED for every backbook
+    code ("ftf disclosure absent - proven by assert_cma_absence.py, not here" - surfaces/
+    cma.md Step 5, "Absence is a positive assertion"). Returns (passed, detail) - detail always
+    carries `control` (None if the sibling has no render on disk yet, an unproven pass) and
+    `output_file` (assert_cma_absence.py's own full report, for the report generator to embed).
+    """
+    sibling = row["replaces_or_replaced_by"]
+    control_path = _find_control_cma_html(sibling)
+
+    cmd = [sys.executable, os.path.join(_HERE, "assert_cma_absence.py"), backbook_html]
+    if control_path:
+        cmd += ["--control", control_path]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    out_path = os.path.join(evidence_dir, "cma_absence_%s.txt" % code)
+    with open(out_path, "w") as fh:
+        fh.write(r.stdout + r.stderr)
+
+    return r.returncode == 0, {"control": control_path, "output_file": out_path,
+                               "exit_code": r.returncode}
+
+
 def run_schumer_box_apply(code, apply_result, row, evidence_dir):
     """Assert the Schumer box apply_driver.py already captured mid-walk. Returns
     (status, detail) - status is "passed" or "failed" (never "not_applicable" here; that is
@@ -551,13 +593,13 @@ def _run(args):
 
     stage = "confetti"
     try:
-        print("[1/6] Confetti pre-flight...")
+        print("[1/7] Confetti pre-flight...")
         confetti_info = confetti_preflight(args.code, row, env=args.confetti_env)
         print("    uuid=%s resolves to %s under env=%s" % (
             confetti_info["uuid"], confetti_info["base_code"], confetti_info["env"]))
 
         stage = "apply"
-        print("[2/6] apply (standalone CDP, zero browser-harness calls)...")
+        print("[2/7] apply (standalone CDP, zero browser-harness calls)...")
         apply_result = run_apply_standalone.run(args.code, args.password,
                                                  headless=args.headless, out_root=None)
         application_uuid = apply_result["application_uuid"]
@@ -565,7 +607,7 @@ def _run(args):
         print("    application_uuid=%s" % application_uuid)
 
         stage = "console"
-        print("[3/6] console: approve, issue, render...")
+        print("[3/7] console: approve, issue, render...")
         console_result = run_console_phase(args.code, application_uuid, mla_base_code,
                                            project, avant_basic_dir)
         print("    credit_card_account_id=%s template_version=%s render_mode=%s"
@@ -574,19 +616,30 @@ def _run(args):
                  console_result["provenance"]["render_mode"]))
 
         stage = "evidence"
-        print("[4/6] pulling evidence out of the container...")
+        print("[4/7] pulling evidence out of the container...")
         local = collect_evidence(args.code, console_result, project, avant_basic_dir,
                                  evidence_dir)
 
         stage = "assert"
-        print("[5/6] asserting the value table...")
+        print("[5/7] asserting the value table...")
         report, assert_exit = run_assertions(args.code, local["observations"], local["html"],
                                              args.confetti_env)
+
+        absence_passed, absence_detail = None, None
+        if row["role"] != "new":
+            stage = "cma_absence"
+            print("[6/7] asserting absence of the launch content (backbook control)...")
+            absence_passed, absence_detail = run_cma_absence(
+                args.code, row, local["html"], evidence_dir)
+            print("    cma_absence -> %s%s" % (
+                "passed" if absence_passed else "failed",
+                " (no --control found for this backbook code - unproven, see output file)"
+                if not absence_detail.get("control") else ""))
 
         schumer_status, schumer_detail = None, None
         if not is_mla:
             stage = "schumer_box_apply"
-            print("[6/6] asserting the Schumer box captured during apply...")
+            print("[7/7] asserting the Schumer box captured during apply...")
             schumer_status, schumer_detail = run_schumer_box_apply(
                 args.code, apply_result, row, evidence_dir)
     except Exception as e:
@@ -623,6 +676,23 @@ def _run(args):
     # the precedent already in data/manifest.json: prior `passed` Attempts for this same code
     # carry 25/25 with RPF equally uncaptured.
     assertions = [row for point in report["points"] for row in point["rows"]]
+
+    # assert_value_table.py deliberately leaves one placeholder row NOT CAPTURED for every
+    # backbook code ("ftf disclosure absent - proven by assert_cma_absence.py, not here") -
+    # its own docstring says absence is only assertable with a frontbook control, which is a
+    # separate script's job. Replace it with the real result computed above, in place, so a
+    # backbook code can actually reach a genuine pass instead of being NOT CAPTURED forever.
+    if absence_passed is not None:
+        for i, a in enumerate(assertions):
+            if a["label"] == "ftf disclosure absent - proven by assert_cma_absence.py, not here":
+                assertions[i] = _assertion_row(
+                    a["label"], absence_passed,
+                    expected="ALL PASS (assert_cma_absence.py)",
+                    actual=("ALL PASS" if absence_passed else "see evidence") + (
+                        " - unproven, no frontbook control on disk"
+                        if not absence_detail.get("control") else ""))
+                break
+
     status = _status_for(assertions)
 
     # predecisioned_terms IS point "2. Decisioned application" (surfaces/predecisioned_terms.md)
@@ -644,12 +714,18 @@ def _run(args):
             schumer_status,
             " (no --control found for this backbook code - unproven, see output file)"
             if row["role"] != "new" and not schumer_detail.get("control") else "")))
+    if absence_passed is not None:
+        print("       cma_absence=%s%s" % (
+            "passed" if absence_passed else "failed",
+            " (unproven - no frontbook control on disk)"
+            if not absence_detail.get("control") else ""))
 
     provenance = _provenance_envelope(
         templateflow_host=console_result["provenance"]["templateflow_host"],
         template_version=console_result["provenance"]["template_version_id"],
         render_mode=console_result["provenance"]["render_mode"],
         mla_forced=is_mla,
+        control=absence_detail.get("control") if absence_detail else None,
     )
     # Captured by explicit id, never re-derived from "the newest file in the directory"
     # (AGENTS.md hard rule 1) - evidence/run-<code>/ can and does hold more than one render
