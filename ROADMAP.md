@@ -450,13 +450,26 @@ harness no longer assumes it.
       the `main` stack
 - [ ] `.branch-provenance` read into the Run evidence, so an artifact says which trunk it proves.
       Written but not yet consumed - a Run is currently branch-flexible and branch-silent
-- [ ] The `mp` path actually walked once end to end. Only `main` has been run. Unknowns to expect:
-      whether `lib/avant/pricing_strategies/service.rb` exists there (it does not, on the SHA
-      FINDINGS #9 checked), and whether the five local patches still apply cleanly
-- [ ] `APPLY_BASE` already redirects the browser walk at a remote host, which is how the ticket's
-      `dev-mp` surfaces get exercised without a local `mp` stack. Untested against basic-mp
+- [x] `.branch-provenance`'s own gap closed a different way, 2026-09-10: `_provenance_envelope()`
+      gained a `branch` field, threaded from `--branch` into every recorded Attempt (not read
+      from the `.branch-provenance` file itself, which carries a finer per-repo SHA breakdown
+      this does not - a smaller, sufficient fix: an artifact now says which trunk each surface
+      was proven against, which is what was actually missing)
+- [x] `mp` bootstrapped and walked for real for the first time, 2026-09-10 - not the full apply
+      chain (that remains genuinely untried), but `bootstrap.sh --branch mp` end to end (clean
+      first-time boot, all 5 local patches applied, every silent-failure check green) plus a
+      real capture+assert of `schumer_box_basic` (FINDINGS #35's `mp`-only route) for all 16
+      direct codes. Neither expected unknown broke anything: the missing
+      `lib/avant/pricing_strategies/service.rb` (FINDINGS #9) never got touched by this route,
+      and all 5 patches applied cleanly
+- [ ] The full apply/decision/render chain, still only ever walked on `main` - `APPLY_BASE`
+      redirecting the browser walk at a remote `dev-mp` host, and whether the five local patches
+      hold up under that heavier path, remain untested
 - [ ] A Run's identity includes its trunk: two Runs from different trunks are not comparable, and
-      the Campaign must not mix them. Enforce it in the Manifest (2.2) rather than by convention
+      the Campaign must not mix them. Enforce it in the Manifest (2.2) rather than by convention -
+      the `branch` field above records the fact per-Attempt but does not yet enforce anything;
+      this session did deliberately mix trunks for the first time (schumer_box_basic on `mp`,
+      everything else on `main`, same 16 codes) with nothing stopping it
 
 ### 1.9 Done when
 
@@ -660,18 +673,21 @@ involvement to generate or view it, matching Phase 2's own "remove the LLM from 
 
 ### 2.6 The Campaign
 
-- [ ] `0122` / `0120` Pair strict-PASS end to end - not yet: every surface passes except
-      `schumer_box_basic` (still `blocked`, `mp`-only route, FINDINGS #35), so the strict
-      Pair-verdict rule (2.5, confirmed with the user - literally all 10 cells) reads this Pair
-      as INCOMPLETE, not PASS. Nothing outstanding is actually wrong - closing this needs a Run
-      against `mp`, not more harness work
-- [ ] CSRV-5300's four Pairs green - same blocker as above, same caveat
+- [x] `0122` / `0120` Pair strict-PASS end to end - 2026-09-10, once `schumer_box_basic` was
+      captured for real against `mp` (FINDINGS #35). All 10 cells `passed`
+- [x] CSRV-5300's four Pairs green - all four are `direct` (`0122/0120`, `0123/0121`), covered
+      by the same fix. **8 of 14 Pairs total now strict-PASS** - every `direct` Pair
+      (`0122/0120`, `0123/0121`, `3303/3302`, `3220/3219`, `5217/5216`, `7213/7212`,
+      `7105/7104`, `9004/9003`). The remaining 6 are all MLA Pairs, correctly INCOMPLETE (not a
+      defect): `schumer_box_basic`/`schumer_box_apply`/`schumer_box_landing` are all
+      `not_applicable` for an MLA code (FINDINGS #8, no uuid to address them with), and the
+      strict all-cells-`passed` rule does not treat `not_applicable` as equivalent to `passed`
 - [x] All 28 Runs attempted on every surface that exists for the code; every non-pass has a
       recorded reason, and "surface blocked on CSRV-58xx" counts as recorded, not as passing -
       2026-09-10: all 28 codes attempted on all 5 Surfaces, zero `pending` cells left. Every
-      Pair's only non-passed cell is `schumer_box_basic=blocked` (both roles); every backbook
-      code's `cma` genuinely passes now (`assert_cma_absence.py` wired in, 9-of-9 discriminating
-      checks, zero `NO TEETH`, on every one of the 14 backbook codes)
+      backbook code's `cma` genuinely passes now (`assert_cma_absence.py` wired in, 9-of-9
+      discriminating checks, zero `NO TEETH`, on all 14); `schumer_box_basic` genuinely passes
+      on all 16 direct codes now too (captured for real against `mp`)
 - [ ] The four `/apply` and landing-page surfaces re-run after CSRV-5843..5846 deploy - both
       `schumer_box_apply` (16/16 applicable codes passed, via the CAF preview bundle override,
       TESTING_BLOCKERS item 3) and `schumer_box_landing` (CSRV-5846's Contentful drafts,
