@@ -3,8 +3,10 @@
 Workdir for the four `[Validation] Frontbook fee launch` tickets (CSRV-5300, 5301, 5302, 5303) under
 epic **CSRV-4119** - Late Fee Increase and Introducing Foreign Transaction Fee, frontbook only.
 
-This file is the entry point and the rules of engagement. `README.md` and `CLAUDE.md` are symlinks to
-it, so there is one copy and it cannot drift.
+This file is the entry point and the rules of engagement for an agent working here. `CLAUDE.md` is
+a symlink to it, so there is one copy and it cannot drift. `README.md` is a separate, human-facing
+file: what this repo does, how to run it, how to read its output - read that one if you are a
+person, not an agent.
 
 **Read all of it before touching anything.** It is short on purpose; every other file is a single
 owner of one topic, listed under [Where to look](#where-to-look).
@@ -124,7 +126,8 @@ Each file owns its topic. If two files disagree, the owner wins.
 ## Layout
 
 ```
-AGENTS.md      this file - entry point and rules (README.md, CLAUDE.md are symlinks to it)
+AGENTS.md      this file - entry point and rules for an agent (CLAUDE.md is a symlink to it)
+README.md      the human-facing file - what this is, how to run it, how to read the report
 ROADMAP.md     the objective, the two phases, dependency state, and the checklist
 DESIGN.md      what the skill is and why it is shaped this way
 SETUP.md       replicable environment setup, the services involved, and the traps
