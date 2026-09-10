@@ -660,11 +660,23 @@ involvement to generate or view it, matching Phase 2's own "remove the LLM from 
 
 ### 2.6 The Campaign
 
-- [ ] `0122` / `0120` Pair green end to end
-- [ ] CSRV-5300's four Pairs green
-- [ ] All 28 Runs attempted on every surface that exists for the code; every non-pass has a
-      recorded reason, and "surface blocked on CSRV-58xx" counts as recorded, not as passing
-- [ ] The four `/apply` and landing-page surfaces re-run after CSRV-5843..5846 deploy
+- [ ] `0122` / `0120` Pair strict-PASS end to end - not yet: every surface passes except
+      `schumer_box_basic` (still `blocked`, `mp`-only route, FINDINGS #35), so the strict
+      Pair-verdict rule (2.5, confirmed with the user - literally all 10 cells) reads this Pair
+      as INCOMPLETE, not PASS. Nothing outstanding is actually wrong - closing this needs a Run
+      against `mp`, not more harness work
+- [ ] CSRV-5300's four Pairs green - same blocker as above, same caveat
+- [x] All 28 Runs attempted on every surface that exists for the code; every non-pass has a
+      recorded reason, and "surface blocked on CSRV-58xx" counts as recorded, not as passing -
+      2026-09-10: all 28 codes attempted on all 5 Surfaces, zero `pending` cells left. Every
+      Pair's only non-passed cell is `schumer_box_basic=blocked` (both roles); every backbook
+      code's `cma` genuinely passes now (`assert_cma_absence.py` wired in, 9-of-9 discriminating
+      checks, zero `NO TEETH`, on every one of the 14 backbook codes)
+- [ ] The four `/apply` and landing-page surfaces re-run after CSRV-5843..5846 deploy - both
+      `schumer_box_apply` (16/16 applicable codes passed, via the CAF preview bundle override,
+      TESTING_BLOCKERS item 3) and `schumer_box_landing` (CSRV-5846's Contentful drafts,
+      TESTING_BLOCKERS item 4) already pass today, pre-deploy, against overrides/previews - not
+      yet re-verified against the real post-deploy/post-publish surfaces
 - [ ] Artifact published and handed to product
 
 ---
