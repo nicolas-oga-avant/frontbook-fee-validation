@@ -118,7 +118,8 @@ Each file owns its topic. If two files disagree, the owner wins.
 | What am I building, and why is it shaped this way? | `DESIGN.md` |
 | What do these words mean? | `CONTEXT.md` |
 | How do I get the stack running, and what will bite me? | `SETUP.md` |
-| What are the steps of one Run? | `.claude/skills/test-frontbook-fee-launch/SKILL.md` |
+| How do I run one Run, or the whole campaign? | `README.md` |
+| What judgment call does a script leave to me, or a Surface halt need? | `.claude/skills/test-frontbook-fee-launch/SKILL.md` |
 | What is broken or surprising about this platform? | `FINDINGS.md` |
 | What is the goal, what is the current state, what is left? | `ROADMAP.md` |
 | Why was this decided? | `DESIGN.md`, `docs/adr/` |
@@ -135,9 +136,10 @@ FINDINGS.md    36 platform findings - every failure mode, with evidence
 CONTEXT.md     glossary
 
 .claude/skills/test-frontbook-fee-launch/
-               SKILL.md - the index: shared steps, Surface selection, the Manifest; bootstrap.sh -
-               idempotent setup; surfaces/ - one file per Surface (cma.md is implemented, the other
-               four are not-yet-implemented/blocked stubs), the runbook's actual step-by-step detail
+               SKILL.md - agent-specific judgment calls a script does not make, and the five
+               Surfaces' status; bootstrap.sh - idempotent setup; surfaces/ - one file per Surface,
+               all five implemented: the manual-fallback notes for when that Surface's own script
+               path halts, not a parallel way to run it
 data/          run-matrix.csv (28 Runs, expected values, UUIDs), manifest.schema.json, redline
                assertions, source sheet
 scripts/       apply_harness.py, assert_cma_absence.py, assert_schumer_box.py, assert_value_table.py,
