@@ -201,6 +201,17 @@ def copy_evidence_file(src, dest_dir, dest_name):
 
 # --- assertions / attempt rendering --------------------------------------------------------
 
+def _fmt_checked_value(value, status):
+    """expected/actual in the value table, unlike every other fmt() call site: None here can be
+    a real, compared value (a backbook code correctly has no late fee / no FTF), not just an
+    absent field. fmt()'s blanket NOT CAPTURED default is right only when the row's own status
+    says nothing was captured - otherwise a None that PASSED a comparison must not render
+    identically to one that was never observed, or a correct result reads as a data gap."""
+    if value is None or value == "":
+        return esc(MISSING if status == MISSING else "none")
+    return esc(value)
+
+
 def render_assertions_table(assertions):
     if not assertions:
         return "<p>%s</p>" % MISSING
@@ -209,7 +220,8 @@ def render_assertions_table(assertions):
         cls = "" if a["passed"] else ' class="row-fail"'
         rows.append(
             "<tr%s><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" % (
-                cls, esc(a["label"]), fmt(a["expected"]), fmt(a["actual"]), badge(a["status"])))
+                cls, esc(a["label"]), _fmt_checked_value(a["expected"], a["status"]),
+                _fmt_checked_value(a["actual"], a["status"]), badge(a["status"])))
     return ("<table><tr><th>Assertion</th><th>Expected</th><th>Actual</th><th>Result</th></tr>"
             "%s</table>" % "".join(rows))
 
