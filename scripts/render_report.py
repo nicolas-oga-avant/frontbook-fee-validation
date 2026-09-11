@@ -47,6 +47,26 @@ SURFACES = manifest_mod.SURFACES
 
 MISSING = "NOT CAPTURED"
 
+# One line each, ROADMAP.md's own surface table (the "Where"/"Codes it applies to" columns) -
+# never re-describe a Surface differently here than what the rest of this repo already says.
+SURFACE_DESCRIPTIONS = [
+    ("cma", "Cardmember agreement",
+     "The rendered letter itself, production TemplateFlow (preview, draft). "
+     "Applies to all 28 codes - the actual document product signs off on."),
+    ("predecisioned_terms", "Decisioned application",
+     "What the applicant was quoted at decision time, read back from avant-basic. "
+     "The only application-time surface an MLA code has."),
+    ("schumer_box_basic", "avant-basic Schumer box",
+     "Standalone page at /schumer_box/&lt;uuid&gt;. The route only exists on the mp branch "
+     "(FINDINGS #35) - not_applicable off mp, and for an MLA code (no uuid)."),
+    ("schumer_box_apply", "Account-opening Schumer box",
+     "Shown mid-apply, the personal_continued stage of /apply?...&amp;strategy=&lt;uuid&gt;. "
+     "Not applicable to an MLA code (no uuid)."),
+    ("schumer_box_landing", "Contentful landing page",
+     "Marketing page at /credit-card/landing/schumer/&lt;uuid&gt;, dev.avant.com. "
+     "Not applicable to an MLA code (no uuid)."),
+]
+
 EXPECTED_FIELD_LABELS = [
     ("late_fee_initial", "late fee (1st)"),
     ("late_fee_subsequent", "late fee (subsequent)"),
@@ -426,6 +446,14 @@ def render_code_page(run, role, pair):
         fh.write(body)
 
 
+def render_surface_legend():
+    rows = "".join(
+        "<tr><th>%s</th><td>%s</td></tr>" % (esc(label), text)
+        for _, label, text in SURFACE_DESCRIPTIONS)
+    return ("<details><summary>What each Surface checks</summary>"
+            "<table>%s</table></details>" % rows)
+
+
 def render_root_index(doc):
     rows = []
     passed_count = sum(1 for p in doc["pairs"] if pair_verdict(p) == "pass")
@@ -463,10 +491,12 @@ def render_root_index(doc):
 (strict: every applicable Surface cell passed - not_applicable cells, e.g. an MLA code's
 Schumer surfaces, do not block PASS, but a failed/halted/blocked/pending one does)</p>
 %s
+%s
 </body></html>""" % (
         STYLE, esc(datetime.now(timezone.utc).isoformat(timespec="seconds")),
         esc(doc["seeded_from"]), esc(doc["database"].get("compose_project")),
-        esc(doc["database"].get("volume")), passed_count, len(doc["pairs"]), "\n".join(rows))
+        esc(doc["database"].get("volume")), passed_count, len(doc["pairs"]),
+        render_surface_legend(), "\n".join(rows))
 
     with open(os.path.join(OUTPUT_DIR, "index.html"), "w") as fh:
         fh.write(body)
