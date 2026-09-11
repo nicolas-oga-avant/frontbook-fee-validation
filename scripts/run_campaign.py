@@ -8,6 +8,11 @@ not one per code.
     python3 scripts/run_campaign.py --codes 0122,0120   # just these, still in dependency order
     python3 scripts/run_campaign.py --ticket CSRV-5300  # just this ticket's Pair(s)
     python3 scripts/run_campaign.py --concurrency 2     # 2 Pairs in flight at once
+    python3 scripts/run_campaign.py --clean             # wipe evidence/run-*, reseed the
+                                                        # Manifest, run all 28 for real - a true
+                                                        # from-scratch Campaign, no dependency
+                                                        # on any prior run (never touches
+                                                        # evidence/baseline/ or pr-preview/)
 
 Wraps scripts/run_validation.py (ROADMAP 2.1-2.2), one subprocess per code, in the order that
 respects the one real dependency between codes: schumer_box_apply's absence checks on a backbook
@@ -38,7 +43,9 @@ Attempt is trusted at face value here exactly as SKILL.md's bare-invocation rule
 
 import argparse
 import csv
+import glob
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -98,6 +105,18 @@ def _lanes(codes, pair_id):
     return [codes_ for _, codes_ in lanes]
 
 
+def _clean_evidence():
+    """Delete evidence/run-* only - never the rest of evidence/. `baseline/` (the verified
+    pre-change 0122 render, AGENTS.md's own layout table) and `pr-preview/` are hand-curated
+    references, not campaign output, and are not safe to reproduce by re-running anything."""
+    removed = 0
+    for path in glob.glob(os.path.join(_ROOT, "evidence", "run-*")):
+        shutil.rmtree(path)
+        removed += 1
+    print("--clean: removed %d evidence/run-* director%s" %
+          (removed, "y" if removed == 1 else "ies"))
+
+
 def _needs_run(code):
     """True unless cma + predecisioned_terms + schumer_box_apply are all already settled
     (passed, or not_applicable for schumer_box_apply on an MLA-forced code)."""
@@ -142,6 +161,9 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="print the plan, run nothing")
     ap.add_argument("--force", action="store_true",
                      help="run every selected code even if already passed")
+    ap.add_argument("--clean", action="store_true",
+                     help="delete evidence/run-* and reseed data/manifest.json first - a true "
+                          "from-scratch Campaign, no dependency on any prior run")
     ap.add_argument("--concurrency", type=int, default=1,
                      help="Pairs to run at once (default 1 - reproduces the pre-concurrency, "
                           "strictly sequential schedule byte-for-byte)")
@@ -157,12 +179,16 @@ def main():
         print("--concurrency must be >= 1", file=sys.stderr)
         return 1
 
-    if not os.path.exists(manifest_mod.MANIFEST):
+    if args.clean:
+        _clean_evidence()
+        print("--clean: reseeding %s (dropping every recorded Attempt)" % manifest_mod.MANIFEST)
+        manifest_mod.seed(force=True,
+                          compose_project=args.compose_project or "basic-frontbook-fee-validation")
+    elif not os.path.exists(manifest_mod.MANIFEST):
         # Safe unconditionally, --force or not: nothing exists yet to clobber. Reseeding an
-        # EXISTING manifest is a different, deliberate act (drops every recorded Attempt,
-        # AGENTS.md hard rule 1) and stays behind `manifest.py seed --force`, never a side
-        # effect of running the Campaign - --force here still only means "ignore already
-        # passed" (line ~166), nothing more.
+        # EXISTING manifest otherwise is a deliberate act (drops every recorded Attempt,
+        # AGENTS.md hard rule 1) and stays behind --clean or `manifest.py seed --force`, never
+        # an implicit side effect - --force alone still only means "ignore already passed."
         print("%s missing - seeding from %s" % (manifest_mod.MANIFEST, MATRIX))
         manifest_mod.seed(compose_project=args.compose_project or "basic-frontbook-fee-validation")
 
