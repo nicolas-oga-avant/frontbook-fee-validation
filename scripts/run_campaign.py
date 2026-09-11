@@ -2,6 +2,8 @@
 not one per code.
 
     python3 scripts/run_campaign.py                    # every code, skip what's already passed
+                                                        # (seeds data/manifest.json first if it
+                                                        # does not exist yet - nothing to lose)
     python3 scripts/run_campaign.py --dry-run           # show the plan, run nothing
     python3 scripts/run_campaign.py --codes 0122,0120   # just these, still in dependency order
     python3 scripts/run_campaign.py --ticket CSRV-5300  # just this ticket's Pair(s)
@@ -154,6 +156,15 @@ def main():
     if args.concurrency < 1:
         print("--concurrency must be >= 1", file=sys.stderr)
         return 1
+
+    if not os.path.exists(manifest_mod.MANIFEST):
+        # Safe unconditionally, --force or not: nothing exists yet to clobber. Reseeding an
+        # EXISTING manifest is a different, deliberate act (drops every recorded Attempt,
+        # AGENTS.md hard rule 1) and stays behind `manifest.py seed --force`, never a side
+        # effect of running the Campaign - --force here still only means "ignore already
+        # passed" (line ~166), nothing more.
+        print("%s missing - seeding from %s" % (manifest_mod.MANIFEST, MATRIX))
+        manifest_mod.seed(compose_project=args.compose_project or "basic-frontbook-fee-validation")
 
     code_filter = args.codes.split(",") if args.codes else None
     plan, pair_id = _ordered_codes(ticket_filter=args.ticket, code_filter=code_filter)
