@@ -128,8 +128,7 @@ STYLE = """
     overflow-x: auto; font-size: 0.85em; }
   img.evidence-shot { max-width: 100%; border: 1px solid #ccc; border-radius: 4px; }
   .surface-header { display: flex; align-items: center; gap: 10px; }
-  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
-  .chips a { text-decoration: none; }
+  .surface-cell a { text-decoration: none; }
 </style>
 """
 
@@ -440,22 +439,22 @@ def render_root_index(doc):
         for role, run in (("backbook", backbook), ("frontbook", frontbook)):
             cma_latest = latest_attempt(run["surfaces"]["cma"])
             mla_forced = (cma_latest or {}).get("provenance", {}).get("mla_forced")
-            chips = " ".join(
-                '<a href="codes/%s/index.html#%s">%s</a>' % (
+            surface_cells = "".join(
+                '<td class="surface-cell"><a href="codes/%s/index.html#%s">%s</a></td>' % (
                     run["code"], s, badge(run["surfaces"][s]["status"]))
                 for s in SURFACES)
             role_rows.append(
                 "<tr><td><a href=\"codes/%s/index.html\">%s</a></td><td>%s</td>"
-                "<td>%s</td><td>%s</td><td class=\"chips\">%s</td></tr>" % (
+                "<td>%s</td><td>%s</td>%s</tr>" % (
                     run["code"], esc(run["code"]), esc(role), esc(run["reachability"]),
-                    fmt(mla_forced), chips))
+                    fmt(mla_forced), surface_cells))
 
         rows.append(
             '<div class="pair"><h2>%s %s</h2><p>%s</p><p class="meta">ticket %s</p>'
-            '<table><tr><th>Code</th><th>Role</th><th>Reachability</th><th>MLA forced</th>'
-            '<th>Surfaces (%s)</th></tr>%s</table></div>' % (
+            '<table><tr><th>Code</th><th>Role</th><th>Reachability</th><th>MLA forced</th>%s'
+            '</tr>%s</table></div>' % (
                 esc(pair["pair_id"]), badge(verdict), diff, esc(pair["ticket"]),
-                ", ".join(SURFACES), "".join(role_rows)))
+                "".join("<th>%s</th>" % esc(s) for s in SURFACES), "".join(role_rows)))
 
     body = """<!doctype html><html><head><meta charset="utf-8">
 <title>Frontbook fee launch validation</title>%s</head><body>
