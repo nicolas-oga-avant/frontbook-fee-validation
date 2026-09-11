@@ -1356,3 +1356,53 @@ code change is still correct and harmless (it computes the same two variables
 `Avant::Email::DataRenderer` already does, the same way), but merging it should not be presented
 as "the fix" for a defect whose existence in production is now in doubt. See the PR #6112 comment
 and the CSRV-5914 ticket comment posted the same day for the fuller writeup.
+
+**Fourth correction, 2026-09-11, and this one is the actual mechanism, found by reading code
+instead of guessing from behavior.** The "unconfirmed" gap above is closed:
+`lib/avant/templateflow/render_from_template.rb`'s `resolved_data` is `renderer_data.merge(data)`
+- `data` is whatever the caller supplies (`cardmember_agreement_log.template_variables`, i.e.
+`generate_cardmember_agreement_inputs`'s hash for a CMA), but `renderer_data` is computed first,
+unconditionally, for **every** template this class renders: it calls
+`Avant::Email::DataRenderer.call!(data_list: variables, product:, ...)` where `variables` is the
+template's own full declared-variable list (`GetVariables.call!` - the same list
+`TemplateflowEngine::Client.get_template_details` already showed includes `card_rpf_eligible` and
+`card_rpf_maximum_fee_amount`). `Avant::Email::DataRenderer` is the one class that already
+computes both correctly (`product.rpf_fee_eligible?` / `Money.new(product.rpf_maximum_fee_amount_cents)`
+- see the very first "actual root cause" section above). Since a CMA is only ever rendered for an
+issued account, `product.status_post_issuance?` is true, so `RenderFromTemplate` always picks
+`Avant::Email::DataRenderer` (not `Avant::Email::Originations::DataRenderer`, which does not
+define RPF at all - checked, in case that branch ever mattered here; it doesn't for a real CMA).
+So **every CMA render, fixed branch or not, already receives `card_rpf_eligible` and
+`card_rpf_maximum_fee_amount` from the generic renderer-data base merge**, before
+`generate_cardmember_agreement_inputs`'s hash is even merged on top. This is not a new discovery
+this repo made either: `cardmember_agreement_inputs.rb` already carries a comment, present on
+`main` well before CSRV-5914, saying exactly this - "The CMA template gets its variables from two
+sources: 1. Data renderer... 2. generate_cardmember_agreement_inputs... The template variables
+from generate_cardmember_agreement_inputs override the data renderer values." Nobody connected
+that comment to this finding until now.
+
+Confirmed empirically, not just by reading code: queried the actual Postgres rows directly
+(`cardmember_agreement_logs.template_variables`, the *resolved*, post-render snapshot - see
+`CardmemberAgreementLetter#capture_resolved_template_variables!`, which overwrites the log's
+input hash with `templateflow_response[:resolved_data]` on first render) for four `0122` renders,
+all against **`main`, unfixed, before the docker-compose fix was even applied to that checkout**:
+every one of them - `cma_log_id` 30, 36, 142, 144 - already carries a `card_rpf_eligible` key with
+a real boolean (`false` on the first three, `true` on the last, tracking Optimizely eligibility,
+not code) and `card_rpf_maximum_fee_amount: 25.0` on all four. The key was never missing on
+`main`. (One loose end not chased further: `cma_log_id` 36's HTML render does not show the
+paragraph despite `card_rpf_eligible: false` resolving the same as 142's, which does show it -
+most likely the underlying Optimizely feature/rollout being toggled between the two render times,
+not a `card_rpf_eligible` boolean-gate difference, but not directly confirmed.)
+
+**Conclusion: there is no wiring gap, on any branch.** CSRV-5914's fix computes
+`card_rpf_eligible`/`card_rpf_maximum_fee_amount` in `generate_cardmember_agreement_inputs`
+exactly the way `Avant::Email::DataRenderer` already does - identical inputs, identical
+`product.rpf_fee_eligible?` call, so the override and the pre-existing base value it overrides
+are always the same value. The PR is a behavior-neutral no-op. The original observed symptom (no
+RPF disclosure on `0122`) was real, but its cause was Optimizely eligibility being false at the
+time (a stale local snapshot, or the "RPF/NSF Eligible Card Accounts" audience/feature not yet
+active for these 28 codes) - not missing code. Recommendation given to the user: close PR #6112
+and CSRV-5914 as "not a code defect - already correctly wired via the generic
+`RenderFromTemplate` -> `DataRenderer` base-render merge; verified by code and by direct database
+inspection on unfixed `main`," rather than merge it as a fix for something that was never broken
+in code.
