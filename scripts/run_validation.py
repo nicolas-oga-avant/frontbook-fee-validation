@@ -168,16 +168,18 @@ _STATIC_SCHUMER_SURFACES = (
 )
 
 
-def record_static_schumer_surfaces(code, row):
+def record_static_schumer_surfaces(code, row, branch):
     """schumer_box_basic needs no application - just the code's uuid (surfaces/
     schumer_box_basic.md) - so it is recorded here independent of whether apply/console/assert
     below succeeds. Probed live rather than assumed: an MLA code is not_applicable (no uuid,
-    FINDINGS #8, decided the same way as schumer_box_apply); otherwise a 404 means still blocked
-    (dev-mp-only, FINDINGS #35), and anything else means the route now resolves - which is not a
-    pass, since this surface has no capture/assert step wired into this script yet (it needs a
-    Run against `mp`, not just a probe against whatever branch this Run is on). That gets
-    `not_implemented`, not a silent `blocked`, so the day `mp` runs are wired in this stops being
-    wrong on its own rather than needing a person to remember to flip it.
+    FINDINGS #8, decided the same way as schumer_box_apply). Off `mp`, a 404 is not_applicable
+    too, and for the same kind of reason: the route does not exist on any other trunk at all
+    (FINDINGS #35), so a Run against `branch` was never going to reach it - a fact about this
+    Run's own parameters, not a gap in it, same as an MLA code's missing uuid. A Run actually
+    against `mp` that still 404s is the genuinely unexpected case and stays `blocked`; either way,
+    the route resolving is not a pass, since this surface has no capture/assert step wired into
+    this script off `mp` - that gets `not_implemented`, not a silent `blocked` or `not_applicable`,
+    so the day the route ships elsewhere this stops being wrong on its own.
 
     schumer_box_landing is NOT here any more - it is asserted for real by
     run_schumer_box_landing() below, the same way schumer_box_apply is.
@@ -198,6 +200,10 @@ def record_static_schumer_surfaces(code, row):
             print("    %s: %s now resolves (not a 404) - needs implementing, not just "
                   "recording (see surfaces/%s.md)" % (surface, url, surface))
             results[surface] = ("not_implemented", None)
+        elif branch != "mp":
+            print("    %s: not reachable off mp (FINDINGS #35) - not_applicable to a "
+                  "%s-branch Run, not blocked" % (surface, branch))
+            results[surface] = ("not_applicable", None)
         else:
             results[surface] = ("blocked", blocked_on)
     return results
@@ -409,11 +415,11 @@ def _handle_schumer_box_basic(args, row, evidence_dir):
     """schumer_box_basic: real capture+assert only on branch=mp for a non-MLA code (the only
     case FINDINGS #35 says the route exists at all); everywhere else, the existing cheap live
     probe (record_static_schumer_surfaces, which already handles MLA -> not_applicable and
-    main -> blocked internally) is exactly right and unchanged."""
+    off-mp -> not_applicable internally) is exactly right and unchanged."""
     if args.branch != "mp" or not row.get("uuid"):
         if not args.skip_manifest:
             for surface, (status, blocked_on) in record_static_schumer_surfaces(
-                    args.code, row).items():
+                    args.code, row, args.branch).items():
                 record_result(args.code, surface, status, blocked_on=blocked_on)
         return
 

@@ -374,11 +374,14 @@ def pair_verdict(pair):
     has no strategy uuid, so schumer_box_basic/schumer_box_apply/schumer_box_landing are not
     unrun or unproven for it, they are genuinely inapplicable (FINDINGS #8) - that is a fact
     about the code, not a gap in validation, and treating it as one would make every MLA Pair
-    permanently unable to reach PASS regardless of how much real work gets done. Confirmed
-    2026-09-10 by scanning the whole Manifest: not_applicable never appears on a direct code, so
-    this relaxation cannot silently paper over a real direct-code gap - it only recognizes a
-    fact already true and already trusted everywhere else in this pipeline (is_mla drives
-    whether these same three surfaces are even attempted in the first place)."""
+    permanently unable to reach PASS regardless of how much real work gets done.
+
+    schumer_box_basic is inapplicable a second way, since 2026-09-11: off `mp` the route does
+    not exist on any trunk this Run could be against (FINDINGS #35), a fact about the Run's own
+    branch parameter rather than the code - so it is not_applicable there too, on direct codes
+    included. Both are the same relaxation (is_mla / the Run's branch each drive whether a
+    surface is even attempted in the first place, same as here) - not a workaround that could
+    paper over a real gap on either axis."""
     statuses = []
     for role in ("backbook", "frontbook"):
         run = pair["runs"][role]
